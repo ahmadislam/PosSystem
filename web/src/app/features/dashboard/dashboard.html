@@ -1,0 +1,49 @@
+<h1>Dashboard</h1>
+<p class="muted">Last 7 days from the sales API (no dedicated analytics endpoint yet).</p>
+
+<div class="kpis">
+  <div class="kpi"><span>Sales</span><strong>{{ count() }}</strong></div>
+  <div class="kpi"><span>Revenue</span><strong>{{ money(revenue()) }}</strong></div>
+  <div class="kpi"><span>Low stock</span><strong>{{ lowStock().length }}</strong></div>
+</div>
+
+<h2>Daily totals</h2>
+<div class="chart">
+  @for (b of bars(); track b.label) {
+    <div class="col">
+      <div class="bar" [style.height.%]="b.pct" [title]="money(b.value)"></div>
+      <span>{{ b.label }}</span>
+    </div>
+  }
+</div>
+
+<div class="split">
+  <section>
+    <h2>Recent invoices</h2>
+    <ul>
+      @for (s of sales().slice(0, 8); track s.id) {
+        <li>
+          <span class="mono">{{ s.invoiceNumber }}</span>
+          <span>{{ s.saleDate | date:'short' }}</span>
+          <strong>{{ money(s.totalAmount) }}</strong>
+        </li>
+      } @empty {
+        <li class="muted">No sales in this window.</li>
+      }
+    </ul>
+  </section>
+  <section>
+    <h2>Low stock</h2>
+    <ul>
+      @for (p of lowStock(); track p.id) {
+        <li>
+          <span class="mono">{{ p.sku }}</span>
+          <span>{{ p.name }}</span>
+          <strong>{{ p.stockQuantity }}</strong>
+        </li>
+      } @empty {
+        <li class="muted">Nothing below threshold.</li>
+      }
+    </ul>
+  </section>
+</div>

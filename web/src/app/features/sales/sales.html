@@ -1,0 +1,30 @@
+<h1>Sales</h1>
+<p class="muted">{{ total() }} invoices</p>
+
+<div class="toolbar">
+  <label>From <input type="date" [(ngModel)]="from" /></label>
+  <label>To <input type="date" [(ngModel)]="to" /></label>
+  <button type="button" class="ghost" (click)="load()">Filter</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Invoice</th><th>When</th><th>Pay</th><th>Status</th><th class="n">Total</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (s of sales(); track s.id) {
+        <tr>
+          <td class="mono">{{ s.invoiceNumber }}</td>
+          <td>{{ s.saleDate | date:'short' }}</td>
+          <td>{{ s.paymentMethod }}</td>
+          <td>{{ s.status }}</td>
+          <td class="n">{{ money(s.totalAmount) }}</td>
+          <td><button type="button" class="tiny" (click)="print(s)">Receipt</button></td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

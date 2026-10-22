@@ -1,0 +1,90 @@
+<div class="head">
+  <div>
+    <h1>Inventory</h1>
+    <p class="muted">{{ total() }} products</p>
+  </div>
+  <button type="button" (click)="startCreate()">New product</button>
+</div>
+
+<div class="toolbar">
+  <input placeholder="Search" [(ngModel)]="search" (keyup.enter)="load()" />
+  <label class="check"><input type="checkbox" [(ngModel)]="lowStockOnly" (change)="load()" /> Low stock</label>
+  <button type="button" class="ghost" (click)="load()">Refresh</button>
+  <input placeholder="New category" [(ngModel)]="newCategory" />
+  <button type="button" class="ghost" (click)="addCategory()">Add category</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>SKU</th><th>Name</th><th>Category</th><th class="n">Cost</th><th class="n">Sale</th>
+        <th class="n">Stock</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (p of products(); track p.id) {
+        <tr [class.low]="p.isLowStock">
+          <td class="mono">{{ p.sku }}</td>
+          <td>{{ p.name }}</td>
+          <td>{{ p.categoryName }}</td>
+          <td class="n">{{ money(p.costPrice) }}</td>
+          <td class="n">{{ money(p.salePrice) }}</td>
+          <td class="n">{{ p.stockQuantity }} / {{ p.minStockThreshold }}</td>
+          <td class="acts">
+            <button type="button" class="tiny" (click)="startEdit(p)">Edit</button>
+            <button type="button" class="tiny" (click)="startAdjust(p)">Stock</button>
+            <button type="button" class="tiny" (click)="remove(p)">Delete</button>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (formOpen()) {
+  <div class="modal" (click)="formOpen.set(false)">
+    <form class="card" (click)="$event.stopPropagation()" (ngSubmit)="save()">
+      <h2>{{ editingId() ? 'Edit product' : 'New product' }}</h2>
+      <label>SKU <input [(ngModel)]="form.sku" name="sku" required /></label>
+      <label>Name <input [(ngModel)]="form.name" name="name" required /></label>
+      <label>Category
+        <select [(ngModel)]="form.categoryId" name="categoryId">
+          @for (c of categories(); track c.id) {
+            <option [ngValue]="c.id">{{ c.name }}</option>
+          }
+        </select>
+      </label>
+      <div class="pair">
+        <label>Cost <input type="number" step="0.01" [(ngModel)]="form.costPrice" name="cost" /></label>
+        <label>Sale <input type="number" step="0.01" [(ngModel)]="form.salePrice" name="sale" /></label>
+      </div>
+      <div class="pair">
+        <label>Tax % <input type="number" step="0.01" [(ngModel)]="form.taxRate" name="tax" /></label>
+        <label>Min stock <input type="number" [(ngModel)]="form.minStockThreshold" name="min" /></label>
+      </div>
+      @if (!editingId()) {
+        <label>Initial stock <input type="number" [(ngModel)]="form.stockQuantity" name="qty" /></label>
+      }
+      <label class="check"><input type="checkbox" [(ngModel)]="form.isActive" name="active" /> Active</label>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <button type="button" class="ghost" (click)="formOpen.set(false)">Cancel</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (adjustId) {
+  <div class="modal" (click)="adjustId = null">
+    <form class="card" (click)="$event.stopPropagation()" (ngSubmit)="applyAdjust()">
+      <h2>Adjust stock</h2>
+      <label>Quantity change <input type="number" [(ngModel)]="adjustQty" name="aq" required /></label>
+      <label>Note <input [(ngModel)]="adjustNote" name="an" required /></label>
+      <div class="actions">
+        <button type="submit">Apply</button>
+        <button type="button" class="ghost" (click)="adjustId = null">Cancel</button>
+      </div>
+    </form>
+  </div>
+}

@@ -1,0 +1,29 @@
+name: CI-CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release
+
+  # Add a 'web' job here when the Angular app exists (npm ci, ng build, ng test).
+
+  deploy:
+    needs: [api]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      # Render: turn OFF auto-deploy for the service and use its Deploy Hook so only tested code ships.
+      - run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"

@@ -1,0 +1,99 @@
+<div class="head">
+  <div>
+    <h1>Register</h1>
+    <p class="muted">
+      @if (shift(); as s) {
+        Shift #{{ s.id }} · {{ s.status }}
+      } @else {
+        No open shift — open one under Shift before checkout.
+      }
+    </p>
+  </div>
+</div>
+
+<div class="pos">
+  <section>
+    <div class="filters">
+      <input placeholder="Search SKU or name" [(ngModel)]="search" (keyup.enter)="loadProducts()" />
+      <select [(ngModel)]="categoryId" (change)="loadProducts()">
+        <option [ngValue]="null">All categories</option>
+        @for (c of categories(); track c.id) {
+          <option [ngValue]="c.id">{{ c.name }}</option>
+        }
+      </select>
+      <button type="button" class="ghost" (click)="loadProducts()">Search</button>
+    </div>
+
+    <div class="grid">
+      @for (p of products(); track p.id) {
+        <button type="button" class="tile" [disabled]="p.stockQuantity <= 0" (click)="add(p)">
+          <span class="sku">{{ p.sku }}</span>
+          <strong>{{ p.name }}</strong>
+          <span class="price">{{ money(p.salePrice) }}</span>
+          <span class="stock" [class.low]="p.isLowStock">{{ p.stockQuantity }} left</span>
+        </button>
+      } @empty {
+        <p class="muted">No products match.</p>
+      }
+    </div>
+  </section>
+
+  <aside class="ticket">
+    <h2>Cart</h2>
+    <ul>
+      @for (line of cart.lines(); track line.product.id) {
+        <li>
+          <div class="row">
+            <strong>{{ line.product.name }}</strong>
+            <button type="button" class="tiny" (click)="cart.remove(line.product.id)">Remove</button>
+          </div>
+          <div class="row nums">
+            <label>Qty
+              <input type="number" min="1" [max]="line.product.stockQuantity" [ngModel]="line.quantity"
+                     (ngModelChange)="cart.setQuantity(line.product.id, $event)" />
+            </label>
+            <label>Disc
+              <input type="number" min="0" step="0.01" [ngModel]="line.discountAmount"
+                     (ngModelChange)="cart.setDiscount(line.product.id, $event)" />
+            </label>
+            <span>{{ money(lineTotals(line.product.salePrice, line.quantity, line.discountAmount, line.product.taxRate).total) }}</span>
+          </div>
+        </li>
+      } @empty {
+        <li class="muted">Tap a product to add it.</li>
+      }
+    </ul>
+
+    <div class="totals">
+      <div><span>Subtotal</span><span>{{ money(cart.preview().subtotal) }}</span></div>
+      <div><span>Discount</span><span>{{ money(cart.preview().discount) }}</span></div>
+      <div><span>Tax</span><span>{{ money(cart.preview().tax) }}</span></div>
+      <div class="grand"><span>Total</span><span>{{ money(cart.preview().total) }}</span></div>
+    </div>
+
+    <label class="pay">Payment
+      <select [(ngModel)]="payment">
+        <option value="Cash">Cash</option>
+        <option value="Card">Card</option>
+        <option value="Online">Online</option>
+      </select>
+    </label>
+
+    <button type="button" class="charge" [disabled]="busy() || cart.count() === 0" (click)="checkout()">
+      {{ busy() ? 'Recording…' : 'Charge ' + money(cart.preview().total) }}
+    </button>
+  </aside>
+</div>
+
+@if (lastSale(); as sale) {
+  <div class="modal" (click)="lastSale.set(null)">
+    <div class="card" (click)="$event.stopPropagation()">
+      <h2>Sale complete</h2>
+      <p>{{ sale.invoiceNumber }} · {{ money(sale.totalAmount) }}</p>
+      <div class="actions">
+        <button type="button" (click)="printReceipt()">Print / PDF</button>
+        <button type="button" class="ghost" (click)="lastSale.set(null)">Close</button>
+      </div>
+    </div>
+  </div>
+}

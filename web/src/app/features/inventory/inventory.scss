@@ -1,0 +1,33 @@
+.head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem; gap: 1rem; }
+h1, h2 { margin: 0 0 0.25rem; }
+.muted { color: var(--muted); margin: 0; }
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 0.8rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--line); text-align: left; }
+.n { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+.mono { font-family: var(--mono); }
+tr.low td { color: #e0b07a; }
+.acts { white-space: nowrap; }
+.tiny { background: none; border: 0; color: var(--accent); cursor: pointer; margin-right: 0.4rem; }
+
+.modal {
+  position: fixed; inset: 0; background: rgb(8 16 14 / 0.7);
+  display: grid; place-items: center; z-index: 40;
+}
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.9rem;
+  padding: 1.25rem; width: min(480px, 92vw); display: flex; flex-direction: column; gap: 0.65rem;
+}
+.card label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.actions { display: flex; gap: 0.5rem; }
+.check { flex-direction: row !important; align-items: center; gap: 0.45rem; color: var(--text); }

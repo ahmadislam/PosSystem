@@ -1,0 +1,23 @@
+<div class="wrap">
+  <form (ngSubmit)="submit()">
+    <p class="eyebrow">POS System</p>
+    <h1>Sign in to the register</h1>
+    <p class="hint">Access token stays in memory. The refresh token is an HttpOnly cookie.</p>
+
+    <label>
+      Username
+      <input name="username" [(ngModel)]="username" autocomplete="username" required />
+    </label>
+    <label>
+      Password
+      <input name="password" [(ngModel)]="password" type="password" autocomplete="current-password" required />
+    </label>
+
+    @if (error()) {
+      <p class="err">{{ error() }}</p>
+    }
+
+    <button type="submit" [disabled]="busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
+    <p class="seed">Default seed: admin / Admin@12345</p>
+  </form>
+</div>

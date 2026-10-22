@@ -1,0 +1,10 @@
+h1 { margin: 0 0 0.2rem; }
+.muted { color: var(--muted); }
+.toolbar { display: flex; gap: 0.75rem; align-items: end; margin: 1rem 0; flex-wrap: wrap; }
+label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
+.table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 0.8rem; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--line); text-align: left; }
+.n { text-align: right; font-family: var(--mono); }
+.mono { font-family: var(--mono); }
+.tiny { background: none; border: 0; color: var(--accent); cursor: pointer; }

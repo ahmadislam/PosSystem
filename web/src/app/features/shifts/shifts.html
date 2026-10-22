@@ -1,0 +1,34 @@
+<h1>Cashier shift</h1>
+<p class="muted">Open → End (PendingClose) → enter counted cash → Close.</p>
+
+@if (!shift() || shift()?.status === 'Closed') {
+  <form class="card" (ngSubmit)="open()">
+    <label>Opening cash
+      <input type="number" min="0" step="0.01" [(ngModel)]="openingCash" name="open" />
+    </label>
+    <button type="submit">Open shift</button>
+  </form>
+}
+
+@if (shift(); as s) {
+  @if (s.status !== 'Closed') {
+    <div class="card">
+      <p>Shift #{{ s.id }} · <strong>{{ s.status }}</strong></p>
+      <ul>
+        <li>Opened {{ s.startTime | date:'medium' }}</li>
+        <li>Opening cash {{ money(s.openingCash) }}</li>
+        <li>Expected cash {{ money(s.expectedCash) }}</li>
+      </ul>
+      @if (s.status === 'Open') {
+        <button type="button" (click)="end()">End shift</button>
+      }
+      @if (s.status === 'PendingClose') {
+        <label>Counted closing cash
+          <input type="number" min="0" step="0.01" [(ngModel)]="closingCash" name="close" />
+        </label>
+        <p class="muted">Variance will be counted − expected.</p>
+        <button type="button" (click)="close()">Close drawer</button>
+      }
+    </div>
+  }
+}

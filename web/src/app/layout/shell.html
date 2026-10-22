@@ -1,0 +1,40 @@
+<div class="shell">
+  <aside>
+    <div class="brand">
+      <span class="mark">POS</span>
+      <div>
+        <strong>Counter</strong>
+        <small>Inventory &amp; sales</small>
+      </div>
+    </div>
+
+    <nav>
+      <a routerLink="/pos" routerLinkActive="on">Register</a>
+      <a routerLink="/shifts" routerLinkActive="on">Shift</a>
+      @if (auth.isStaff()) {
+        <a routerLink="/dashboard" routerLinkActive="on">Dashboard</a>
+        <a routerLink="/inventory" routerLinkActive="on">Inventory</a>
+        <a routerLink="/sales" routerLinkActive="on">Sales</a>
+      }
+    </nav>
+
+    <div class="who">
+      <span class="name">{{ auth.username() }}</span>
+      <span class="role">{{ auth.role() }}</span>
+      @if (cart.count() > 0) {
+        <span class="cart-chip">{{ cart.count() }} in cart</span>
+      }
+      <button type="button" class="ghost" (click)="logout()">Sign out</button>
+    </div>
+  </aside>
+
+  <main>
+    @if (toast.message(); as msg) {
+      <div class="toast" [class.err]="toast.kind() === 'err'" [class.warn]="toast.kind() === 'warn'">
+        {{ msg }}
+        <button type="button" (click)="toast.clear()">×</button>
+      </div>
+    }
+    <router-outlet />
+  </main>
+</div>
