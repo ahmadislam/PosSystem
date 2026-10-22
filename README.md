@@ -28,3 +28,4 @@ Swagger: http://localhost:5080/swagger - default login `admin` / `Admin@12345` (
 - API: Render (Docker web service). Set `ConnectionStrings__Default`, `Jwt__Key`, `Cors__Origins__0`, `Seed__AdminPassword`.
 - Database: free external PostgreSQL (e.g. Supabase pooler connection string).
 - CI/CD: add `RENDER_DEPLOY_HOOK` as a GitHub Actions secret.
+# PosSystem
