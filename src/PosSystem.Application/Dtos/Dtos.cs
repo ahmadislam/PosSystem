@@ -66,3 +66,13 @@ public record SaleItemDto(int ProductId, string Sku, string ProductName, int Qua
 public record SaleDto(int Id, string InvoiceNumber, DateTime SaleDate, decimal Subtotal, decimal DiscountAmount,
     decimal TaxAmount, decimal TotalAmount, PaymentMethod PaymentMethod, SaleStatus Status,
     IReadOnlyList<SaleItemDto> Items);
+
+// ---- Dashboard ----
+public record DailySalesDto(DateTime Date, decimal Revenue);
+public record DashboardSummaryDto(
+    int TotalSales,
+    decimal Revenue,
+    int LowStockCount,
+    IReadOnlyList<DailySalesDto> DailySales,
+    IReadOnlyList<SaleDto> RecentSales,
+    IReadOnlyList<ProductDto> LowStockProducts);

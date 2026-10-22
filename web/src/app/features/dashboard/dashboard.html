@@ -1,10 +1,10 @@
 <h1>Dashboard</h1>
-<p class="muted">Last 7 days from the sales API (no dedicated analytics endpoint yet).</p>
+<p class="muted">Last 7 days of sales and inventory activity.</p>
 
 <div class="kpis">
   <div class="kpi"><span>Sales</span><strong>{{ count() }}</strong></div>
   <div class="kpi"><span>Revenue</span><strong>{{ money(revenue()) }}</strong></div>
-  <div class="kpi"><span>Low stock</span><strong>{{ lowStock().length }}</strong></div>
+  <div class="kpi"><span>Low stock</span><strong>{{ lowStockCount() }}</strong></div>
 </div>
 
 <h2>Daily totals</h2>

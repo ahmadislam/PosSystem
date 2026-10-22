@@ -88,6 +88,20 @@ export interface SaleDto {
   items: SaleItemDto[];
 }
 
+export interface DailySalesDto {
+  date: string;
+  revenue: number;
+}
+
+export interface DashboardSummaryDto {
+  totalSales: number;
+  revenue: number;
+  lowStockCount: number;
+  dailySales: DailySalesDto[];
+  recentSales: SaleDto[];
+  lowStockProducts: ProductDto[];
+}
+
 export interface CartLine {
   product: ProductDto;
   quantity: number;

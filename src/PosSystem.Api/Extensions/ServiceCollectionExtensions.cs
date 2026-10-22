@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IShiftService, ShiftService>();
         services.AddScoped<ISaleService, SaleService>();
+        services.AddScoped<IDashboardService, DashboardService>();
         return services;
     }
 }

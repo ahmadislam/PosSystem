@@ -1,14 +1,15 @@
-# POS System - Inventory & Sales Management
+# POS System - Point of Sale, Inventory & Sales Management
 
-ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular frontend (coming in phase 2).
+ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular point-of-sale frontend.
 
-## Phase 1 (this commit): backend foundation
+## Current capabilities
 - JWT auth with refresh-token rotation (refresh token in an HttpOnly cookie, stored hashed)
 - Roles: Admin, Manager, Cashier
 - Categories, products (search, pagination), stock adjustments with a full stock movement history
 - Cashier shifts: Open -> PendingClose -> Closed, with cash variance
 - POS sales: transactional stock deduction, race-free invoice numbers, concurrency protection (xmin)
 - Soft delete via EF Core global query filters, automatic audit trail (old vs new values)
+- Angular POS, inventory, sales, shift, and dashboard screens; dashboard aggregates sales and low-stock metrics server-side
 - Swagger UI, `/health`, global error handling, Docker, GitHub Actions CI/CD
 
 ## Run locally

@@ -4,6 +4,7 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   CategoryDto,
+  DashboardSummaryDto,
   PagedResult,
   PaymentMethod,
   ProductDto,
@@ -91,5 +92,10 @@ export class PosApi {
     if (from) params = params.set('from', from);
     if (to) params = params.set('to', to);
     return this.http.get<PagedResult<SaleDto>>(`${this.root}/api/sales`, { params });
+  }
+
+  dashboardSummary(from: string, to: string): Observable<DashboardSummaryDto> {
+    const params = new HttpParams().set('from', from).set('to', to);
+    return this.http.get<DashboardSummaryDto>(`${this.root}/api/dashboard`, { params });
   }
 }
