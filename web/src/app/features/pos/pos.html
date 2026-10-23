@@ -113,6 +113,10 @@
           <option value="">Select provider</option>
           <option value="Demo terminal">Demo terminal</option>
           <option value="Demo online">Demo online</option>
+          @if (payment === 'Online') {
+            <option value="Easypaisa">Easypaisa</option>
+            <option value="JazzCash">JazzCash</option>
+          }
           <option value="Other">Other</option>
         </select>
       </label>
