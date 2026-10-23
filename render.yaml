@@ -7,6 +7,8 @@ services:
     plan: free
     branch: feature/release-readiness
     healthCheckPath: /health
+    # GitHub Actions gates the deploy hook on all readiness checks.
+    # Keep the repository DEPLOY_BRANCH variable aligned if this branch changes.
     autoDeploy: false
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
