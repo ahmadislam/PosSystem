@@ -1,5 +1,6 @@
 using MailKit.Security;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using MimeKit;
 using MailKit.Net.Smtp;
 
@@ -18,6 +19,7 @@ public sealed class EmailOptions
     public string SenderName { get; set; } = "POS System";
     public bool UseStartTls { get; set; } = true;
     public bool UseSslOnConnect { get; set; }
+    public int TimeoutSeconds { get; set; } = 15;
 
     public static bool IsValid(EmailOptions options) =>
         !options.Enabled ||
@@ -33,8 +35,17 @@ public interface IEmailSender
     Task SendAsync(string recipient, string subject, string htmlBody, CancellationToken ct = default);
 }
 
-public sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSender
+public sealed class SmtpEmailSender : IEmailSender
 {
+    private readonly ILogger<SmtpEmailSender> logger;
+    private readonly IOptions<EmailOptions> options;
+
+    public SmtpEmailSender(IOptions<EmailOptions> options, ILogger<SmtpEmailSender> logger)
+    {
+        this.options = options;
+        this.logger = logger;
+    }
+
     public async Task SendAsync(string recipient, string subject, string htmlBody, CancellationToken ct = default)
     {
         var settings = options.Value;
@@ -49,10 +60,24 @@ public sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSend
             : settings.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
 
         using var client = new SmtpClient();
-        await client.ConnectAsync(settings.SmtpHost, settings.SmtpPort, security, ct);
-        if (!string.IsNullOrWhiteSpace(settings.Username))
-            await client.AuthenticateAsync(settings.Username, settings.Password, ct);
-        await client.SendAsync(message, ct);
-        await client.DisconnectAsync(true, ct);
+        client.Timeout = Math.Clamp(settings.TimeoutSeconds, 5, 120) * 1000;
+        try
+        {
+            logger.LogInformation("Connecting to SMTP server {Host}:{Port} using {Security}.", settings.SmtpHost, settings.SmtpPort, security);
+            await client.ConnectAsync(settings.SmtpHost, settings.SmtpPort, security, ct);
+            if (!string.IsNullOrWhiteSpace(settings.Username))
+            {
+                logger.LogInformation("Authenticating with SMTP server {Host}.", settings.SmtpHost);
+                await client.AuthenticateAsync(settings.Username, settings.Password, ct);
+            }
+            await client.SendAsync(message, ct);
+            await client.DisconnectAsync(true, ct);
+            logger.LogInformation("SMTP message sent to {Recipient}.", recipient);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "SMTP delivery failed to {Recipient} via {Host}:{Port}.", recipient, settings.SmtpHost, settings.SmtpPort);
+            throw;
+        }
     }
 }
