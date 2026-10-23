@@ -50,7 +50,7 @@ public static class DbSeeder
 
     private static async Task SeedDemoDataAsync(AppDbContext db)
     {
-        const string marker = "DemoDataSeeded";
+        const string marker = "DemoDataSeededV2";
         if (await db.Settings.AnyAsync(s => s.SettingKey == marker)) return;
 
         var beverages = await db.Categories.FirstOrDefaultAsync(c => c.Name == "Beverages" && !c.IsDeleted);
@@ -84,11 +84,31 @@ public static class DbSeeder
         await AddProductAsync(db, "TEA-100", "Green Tea 100 bags", "Caffeine-free demo tea", beverages.Id, foods.Id, 3m, 6m, 5m, 12, 4);
         await AddProductAsync(db, "CHP-050", "Chocolate Bar", "50g chocolate bar", snacks.Id, sweets.Id, .5m, 1.25m, 0m, 40, 8);
         await AddProductAsync(db, "LOW-001", "Low Stock Sample", "Used to trigger an alert", snacks.Id, sweets.Id, 1m, 2m, 0m, 2, 5);
+        await AddProductAsync(db, "COF-1KG", "House Coffee 1kg", "Bulk Arabica coffee beans", beverages.Id, foods.Id, 14m, 24.99m, 5m, 18, 4);
+        await AddProductAsync(db, "TEA-BLK", "Breakfast Tea", "Black tea bags, 80 count", beverages.Id, foods.Id, 2.25m, 4.5m, 5m, 30, 6);
+        await AddProductAsync(db, "JUI-500", "Orange Juice", "500ml chilled juice", beverages.Id, foods.Id, 1.1m, 2.75m, 5m, 16, 5);
+        await AddProductAsync(db, "WAT-500", "Spring Water", "500ml bottled water", beverages.Id, foods.Id, .25m, 1m, 0m, 60, 12);
+        await AddProductAsync(db, "CHP-100", "Dark Chocolate", "100g dark chocolate bar", snacks.Id, sweets.Id, 1m, 2.5m, 0m, 22, 5);
+        await AddProductAsync(db, "NUT-200", "Roasted Nuts", "200g salted mixed nuts", snacks.Id, sweets.Id, 2m, 4.25m, 0m, 14, 4);
+        await AddProductAsync(db, "CKE-006", "Cookie Pack", "Six assorted cookies", snacks.Id, sweets.Id, 1.25m, 3m, 0m, 3, 5);
+        await AddProductAsync(db, "GFT-001", "Gift Bag", "Reusable paper gift bag", snacks.Id, sweets.Id, .4m, 1.5m, 0m, 9, 3);
 
         if (!await db.Customers.AnyAsync(c => c.Email == "customer@example.test" && !c.IsDeleted))
             db.Customers.Add(new Customer { Name = "Demo Customer", Email = "customer@example.test", Phone = "+1 555 010 0200", Address = "1 Example Road" });
+        if (!await db.Customers.AnyAsync(c => c.Email == "loyal@example.test" && !c.IsDeleted))
+            db.Customers.Add(new Customer { Name = "Loyalty Member", Email = "loyal@example.test", Phone = "+1 555 010 0201", Address = "2 Sample Lane", LoyaltyPoints = 250 });
+        if (!await db.Customers.AnyAsync(c => c.Email == "business@example.test" && !c.IsDeleted))
+            db.Customers.Add(new Customer { Name = "Business Customer", Email = "business@example.test", Phone = "+1 555 010 0202", Address = "3 Market Street" });
+        if (!await db.Customers.AnyAsync(c => c.Email == "inactive@example.test" && !c.IsDeleted))
+            db.Customers.Add(new Customer { Name = "Inactive Customer", Email = "inactive@example.test", Phone = "+1 555 010 0203", Address = "4 Archive Road", IsActive = false });
         if (!await db.Coupons.AnyAsync(c => c.Code == "WELCOME10"))
             db.Coupons.Add(new Coupon { Code = "WELCOME10", Name = "Welcome ten percent", IsPercentage = true, Value = 10m, StartsAt = DateTime.UtcNow.AddMinutes(-5), EndsAt = DateTime.UtcNow.AddDays(30) });
+        if (!await db.Coupons.AnyAsync(c => c.Code == "SAVE5"))
+            db.Coupons.Add(new Coupon { Code = "SAVE5", Name = "Five currency units off", Value = 5m, StartsAt = DateTime.UtcNow.AddMinutes(-5), EndsAt = DateTime.UtcNow.AddDays(60), MaxRedemptions = 50 });
+        if (!await db.Coupons.AnyAsync(c => c.Code == "EXPIRED"))
+            db.Coupons.Add(new Coupon { Code = "EXPIRED", Name = "Expired demo coupon", IsPercentage = true, Value = 15m, StartsAt = DateTime.UtcNow.AddDays(-60), EndsAt = DateTime.UtcNow.AddDays(-30), IsActive = false });
+        if (!await db.Coupons.AnyAsync(c => c.Code == "HALFPRICE"))
+            db.Coupons.Add(new Coupon { Code = "HALFPRICE", Name = "Half price test", IsPercentage = true, Value = 50m, StartsAt = DateTime.UtcNow.AddMinutes(-5), EndsAt = DateTime.UtcNow.AddDays(7), MaxRedemptions = 10 });
         db.Settings.Add(new Setting { SettingKey = marker, Value = DateTime.UtcNow.ToString("O") });
         await db.SaveChangesAsync();
     }
