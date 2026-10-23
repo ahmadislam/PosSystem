@@ -16,6 +16,7 @@ export class Login {
 
   username = 'admin';
   password = '';
+  showPassword = false;
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
 

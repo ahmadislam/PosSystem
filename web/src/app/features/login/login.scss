@@ -1,63 +1,26 @@
-.wrap {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 1.5rem;
-  background:
-    radial-gradient(1200px 500px at 10% -10%, #1b3d32 0%, transparent 55%),
-    var(--bg);
-}
-
-form {
-  width: min(420px, 100%);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 1.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.eyebrow {
-  color: var(--accent);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  font-size: 0.72rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-h1 { margin: 0; font-size: 1.6rem; }
-.hint, .seed { color: var(--muted); font-size: 0.85rem; margin: 0; }
-.err { color: #f0a0a0; margin: 0; }
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-input {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  color: var(--text);
-  border-radius: 0.5rem;
-  padding: 0.65rem 0.75rem;
-  font: inherit;
-}
-
-button {
-  margin-top: 0.4rem;
-  background: var(--accent);
-  color: #082016;
-  border: 0;
-  border-radius: 0.55rem;
-  padding: 0.75rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-button:disabled { opacity: 0.6; cursor: wait; }
+:host { display: block; min-height: 100dvh; }
+.login-shell { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(360px, .9fr); background: #f4f8f7; color: #102a29; }
+.brand-stage { position: relative; overflow: hidden; display: grid; place-items: center; min-height: 100dvh; background: linear-gradient(145deg, #d9efec, #eef8f5 55%, #cbe7e4); }
+.form-stage { display: grid; place-items: center; padding: 2rem clamp(1rem, 5vw, 5rem); background: #f8fbfa; }
+.login-card { width: min(420px, 100%); display: flex; flex-direction: column; gap: .85rem; }
+.brand-lockup, .mobile-brand { color: #087b88; font-size: clamp(2.4rem, 5vw, 4.5rem); font-weight: 800; letter-spacing: -.07em; display: flex; align-items: center; gap: .15em; z-index: 2; }
+.brand-lockup small { display: block; position: absolute; margin: 6.5rem 0 0 5rem; font-size: .65rem; letter-spacing: .28em; color: #3b7779; }
+.rabbit { display: inline-grid; place-items: center; width: 1.2em; height: 1.2em; border-radius: 45% 55% 48% 52%; background: #087b88; color: #d9efec; font-size: .8em; transform: rotate(-30deg); }
+.mobile-brand { display: none; font-size: 2rem; }
+.eyebrow { margin: 0; text-transform: uppercase; letter-spacing: .2em; font-size: .72rem; font-weight: 800; color: #15949a; }
+h1 { margin: 0; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.05em; line-height: 1.05; }
+.hint { margin: 0 0 1rem; color: #6b8584; }
+label { display: flex; flex-direction: column; gap: .4rem; font-size: .88rem; color: #466967; font-weight: 600; }
+input { box-sizing: border-box; width: 100%; border: 1px solid #d7e5e2; background: #fff; color: #163433; border-radius: 999px; padding: .9rem 1rem; font: inherit; outline: none; transition: border-color .2s, box-shadow .2s; }
+input:focus { border-color: #22b7ad; box-shadow: 0 0 0 4px #22b7ad22; }
+.password-field { position: relative; display: block; }.password-field input { padding-right: 4.5rem; }
+.visibility { position: absolute; right: .45rem; top: .35rem; border: 0; background: transparent; color: #15949a; padding: .5rem .7rem; cursor: pointer; font-weight: 700; }
+.submit { margin-top: .5rem; border: 0; border-radius: 999px; padding: 1rem; background: #19b89e; color: #062925; font: inherit; font-weight: 800; cursor: pointer; box-shadow: 0 12px 24px #19b89e33; transition: transform .2s, box-shadow .2s; }.submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 16px 28px #19b89e44; }.submit:disabled { opacity: .65; cursor: wait; }
+.err { margin: 0; padding: .75rem 1rem; border-radius: .75rem; color: #a33535; background: #ffe7e5; }.secure-note { text-align: center; color: #78918f; font-size: .75rem; margin: .5rem 0 0; }.secure-note span { color: #19b89e; }
+.floating-screen { position: absolute; width: min(330px, 38vw); border: 1px solid #fff9; border-radius: 1.4rem; padding: 1.25rem; background: #ffffffdd; box-shadow: 0 28px 70px #166e7650; backdrop-filter: blur(12px); animation: float 5s ease-in-out infinite; }
+.screen-back { top: 17%; right: 10%; transform: rotate(8deg); animation-delay: -1.2s; }.screen-front { bottom: 18%; left: 12%; transform: rotate(-7deg); animation-delay: -.5s; }
+.screen-dot { display: inline-block; width: .45rem; height: .45rem; border-radius: 50%; background: #19b89e; margin-right: .3rem; }.screen-title { margin-top: 2rem; color: #54817f; }.screen-total { color: #087b88; font-size: 2.2rem; font-weight: 800; margin: .4rem 0 1rem; }.screen-bars { display: flex; align-items: end; gap: .35rem; height: 60px; }.screen-bars i { flex: 1; background: #76d8c4; border-radius: .3rem .3rem 0 0; }.screen-bars i:nth-child(1) { height: 35%; }.screen-bars i:nth-child(2) { height: 65%; }.screen-bars i:nth-child(3) { height: 45%; }.screen-bars i:nth-child(4) { height: 85%; }.screen-bars i:nth-child(5) { height: 70%; }
+.screen-top, .sale-row { display: flex; justify-content: space-between; align-items: center; padding: .65rem 0; color: #315c5a; }.screen-top b { color: #19b89e; font-size: .7rem; }.mini-logo { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: .5rem; background: #087b88; color: white; font-weight: 800; }.sale-row { border-top: 1px solid #dbeae7; font-size: .8rem; }.muted-row { color: #19a487; }
+.glow { position: absolute; border-radius: 50%; filter: blur(2px); opacity: .45; }.glow-one { width: 260px; height: 260px; top: 5%; left: 10%; background: #a8e6df; }.glow-two { width: 200px; height: 200px; bottom: 6%; right: 12%; background: #b8dff0; }.stage-caption { position: absolute; bottom: 2rem; color: #4e8584; font-size: .9rem; }
+@keyframes float { 0%, 100% { margin-top: 0; } 50% { margin-top: -14px; } }
+@media (max-width: 800px) { .login-shell { grid-template-columns: 1fr; }.brand-stage { min-height: 34dvh; }.brand-lockup { font-size: 2.6rem; }.brand-lockup small, .stage-caption, .screen-back { display: none; }.screen-front { width: 230px; left: auto; right: 8%; bottom: 8%; transform: rotate(-4deg) scale(.72); transform-origin: bottom right; }.form-stage { min-height: 66dvh; align-items: start; padding-top: 2.5rem; }.mobile-brand { display: flex; }.form-stage .login-card { gap: .75rem; } }

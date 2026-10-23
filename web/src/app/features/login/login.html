@@ -1,7 +1,16 @@
-<div class="wrap">
-  <form (ngSubmit)="submit()">
-    <p class="eyebrow">POS System</p>
-    <h1>Sign in to the register</h1>
+<main class="login-shell">
+  <section class="brand-stage" aria-label="POS system preview">
+    <div class="glow glow-one"></div><div class="glow glow-two"></div>
+    <div class="brand-lockup"><span class="rabbit" aria-hidden="true">⌁</span><span>Counter</span><small>POINT OF SALE</small></div>
+    <div class="floating-screen screen-back" aria-hidden="true"><span class="screen-dot"></span><span class="screen-dot"></span><span class="screen-dot"></span><div class="screen-title">Today’s register</div><div class="screen-total">$1,248.50</div><div class="screen-bars"><i></i><i></i><i></i><i></i><i></i></div></div>
+    <div class="floating-screen screen-front" aria-hidden="true"><div class="screen-top"><span class="mini-logo">P</span><span>Live sales</span><b>●</b></div><div class="sale-row"><span>House Coffee</span><strong>$8.50</strong></div><div class="sale-row"><span>Chocolate Bar</span><strong>$1.25</strong></div><div class="sale-row muted-row"><span>Payment completed</span><strong>✓</strong></div></div>
+    <p class="stage-caption">One calm workspace for every sale.</p>
+  </section>
+  <section class="form-stage">
+  <form (ngSubmit)="submit()" class="login-card">
+    <div class="mobile-brand"><span class="rabbit" aria-hidden="true">⌁</span><span>Counter</span></div>
+    <p class="eyebrow">Welcome back</p>
+    <h1>Sign in to your register</h1>
     <p class="hint">Use your staff account to access sales and inventory.</p>
 
     <label>
@@ -10,13 +19,14 @@
     </label>
     <label>
       Password
-      <input name="password" [(ngModel)]="password" type="password" autocomplete="current-password" required />
+      <span class="password-field"><input name="password" [(ngModel)]="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" required /><button type="button" class="visibility" (click)="showPassword = !showPassword" [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'">{{ showPassword ? 'Hide' : 'Show' }}</button></span>
     </label>
 
     @if (error()) {
       <p class="err">{{ error() }}</p>
     }
 
-    <button type="submit" [disabled]="busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
+    <button type="submit" class="submit" [disabled]="busy()">{{ busy() ? 'Signing in…' : 'Continue to Counter' }}</button>
+    <p class="secure-note"><span>●</span> Secure staff access · Your session is protected</p>
   </form>
-</div>
+</section></main>
