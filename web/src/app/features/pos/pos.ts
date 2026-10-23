@@ -46,6 +46,7 @@ export class Pos implements OnInit {
   readonly busy = signal(false);
   readonly lastSale = signal<SaleDto | null>(null);
   readonly lastChangeDue = signal<number | null>(null);
+  readonly lastAddedId = signal<number | null>(null);
 
   ngOnInit(): void {
     this.api.categories().subscribe({ next: (c) => this.categories.set(c) });
@@ -78,6 +79,12 @@ export class Pos implements OnInit {
     this.loadProducts();
   }
 
+  setCategory(categoryId: number | null): void {
+    if (this.categoryId === categoryId) return;
+    this.categoryId = categoryId;
+    this.searchProducts();
+  }
+
   movePage(delta: number): void {
     this.page.update((page) => Math.max(1, Math.min(this.totalPages(), page + delta)));
     this.loadProducts();
@@ -90,7 +97,7 @@ export class Pos implements OnInit {
       next: (product) => {
         const message = this.cart.add(product);
         if (message) this.toast.show(message, 'warn');
-        else this.toast.show(`${product.sku} added to cart.`);
+        else this.confirmAdded(product);
         this.barcode = '';
       },
       error: (e) => this.toast.show(e.status === 404
@@ -108,6 +115,7 @@ export class Pos implements OnInit {
   add(p: ProductDto): void {
     const msg = this.cart.add(p);
     if (msg) this.toast.show(msg, 'warn');
+    else this.confirmAdded(p);
   }
 
   checkout(): void {
@@ -233,5 +241,13 @@ export class Pos implements OnInit {
 
   private roundMoney(amount: number): number {
     return Math.round((amount + Number.EPSILON) * 100) / 100;
+  }
+
+  private confirmAdded(product: ProductDto): void {
+    this.lastAddedId.set(product.id);
+    this.toast.show(`${product.name} added to cart.`);
+    window.setTimeout(() => {
+      if (this.lastAddedId() === product.id) this.lastAddedId.set(null);
+    }, 420);
   }
 }

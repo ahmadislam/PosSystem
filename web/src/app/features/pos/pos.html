@@ -1,78 +1,95 @@
-<div class="head">
+<header class="register-header">
   <div>
+    <p class="eyebrow">Point of sale</p>
     <h1>Register</h1>
     <p class="muted">
       @if (shift(); as s) {
-        Shift #{{ s.id }} · {{ s.status }}
+        <span class="status-dot"></span> Shift #{{ s.id }} · {{ s.status }}
       } @else {
-        No open shift — open one under Shift before checkout.
+        <span class="status-dot offline"></span> No open shift — open one under Shift before checkout.
       }
     </p>
   </div>
-</div>
+  <div class="register-meta"><span>{{ products().length }} products shown</span><span class="live-indicator">Live</span></div>
+</header>
 
 <div class="pos">
-  <section>
-    <div class="filters">
-      <input placeholder="Search products by name or SKU" [(ngModel)]="search" (keyup.enter)="searchProducts()" />
-      <select [(ngModel)]="categoryId" (change)="searchProducts()">
-        <option [ngValue]="null">All categories</option>
-        @for (c of categories(); track c.id) {
-          <option [ngValue]="c.id">{{ c.name }}</option>
-        }
-      </select>
-      <button type="button" class="ghost" (click)="searchProducts()">Search</button>
-      <input aria-label="Scan barcode or SKU" placeholder="Scan barcode / exact SKU" [(ngModel)]="barcode"
-        (keyup.enter)="scanBarcode()" autocomplete="off" />
+  <section class="catalog-panel" aria-label="Product catalog">
+    <div class="catalog-tools">
+      <label class="search-field">
+        <span class="sr-only">Search products</span>
+        <span aria-hidden="true">⌕</span>
+        <input placeholder="Search products or SKU" [(ngModel)]="search" (keyup.enter)="searchProducts()" />
+      </label>
+      <button type="button" class="search-button" (click)="searchProducts()">Search</button>
+      <label class="scan-field">
+        <span class="sr-only">Scan barcode or SKU</span>
+        <input aria-label="Scan barcode or SKU" placeholder="Scan barcode / SKU" [(ngModel)]="barcode"
+          (keyup.enter)="scanBarcode()" autocomplete="off" />
+      </label>
     </div>
-    @if (totalPages() > 1) {
-      <nav class="catalog-pages" aria-label="Product pages">
-        <button type="button" class="ghost" [disabled]="page() <= 1" (click)="movePage(-1)">Previous</button>
-        <span>Page {{ page() }} of {{ totalPages() }}</span>
-        <button type="button" class="ghost" [disabled]="page() >= totalPages()" (click)="movePage(1)">Next</button>
-      </nav>
-    }
 
-    <div class="grid">
-      @for (p of products(); track p.id) {
-        <button type="button" class="tile" [disabled]="p.stockQuantity <= 0" (click)="add(p)">
-          @if (p.primaryImageUrl) {
-            <img class="product-image" [src]="api.assetUrl(p.primaryImageUrl)" [alt]="p.name" loading="lazy" />
-          }
-          <span class="sku">{{ p.sku }}</span>
-          <strong>{{ p.name }}</strong>
-          <span class="price">{{ money(p.salePrice) }}</span>
-          <span class="stock" [class.low]="p.isLowStock">{{ p.stockQuantity }} left</span>
-        </button>
-      } @empty {
-        <p class="muted">No products match.</p>
+    <div class="category-rail" aria-label="Product categories">
+      <button type="button" class="category-chip" [class.active]="categoryId === null" [attr.aria-pressed]="categoryId === null"
+        (click)="setCategory(null)">All items</button>
+      @for (c of categories(); track c.id) {
+        <button type="button" class="category-chip" [class.active]="categoryId === c.id" [attr.aria-pressed]="categoryId === c.id"
+          (click)="setCategory(c.id)">{{ c.name }}</button>
       }
+    </div>
+
+    <div class="catalog-heading">
+      <div><h2>Catalog</h2><p>Tap an item to add it to the current sale.</p></div>
+      @if (totalPages() > 1) {
+        <nav class="catalog-pages" aria-label="Product pages">
+          <button type="button" class="page-button" [disabled]="page() <= 1" (click)="movePage(-1)">←</button>
+          <span>Page {{ page() }} / {{ totalPages() }}</span>
+          <button type="button" class="page-button" [disabled]="page() >= totalPages()" (click)="movePage(1)">→</button>
+        </nav>
+      }
+    </div>
+
+    <div class="catalog-scroller">
+      <div class="grid">
+        @for (p of products(); track p.id) {
+          <button type="button" class="tile" [class.added]="lastAddedId() === p.id" [disabled]="p.stockQuantity <= 0" (click)="add(p)">
+            <span class="product-media">
+              @if (p.primaryImageUrl) {
+                <img class="product-image" [src]="api.assetUrl(p.primaryImageUrl)" [alt]="p.name" loading="lazy" />
+              } @else {
+                <span class="product-placeholder" aria-hidden="true">{{ p.sku.charAt(0) }}</span>
+              }
+              @if (p.isLowStock) { <span class="low-badge">Low stock</span> }
+            </span>
+            <span class="sku">{{ p.sku }}</span>
+            <strong>{{ p.name }}</strong>
+            <span class="product-bottom"><span class="price">{{ money(p.salePrice) }}</span><span class="stock" [class.low]="p.isLowStock">{{ p.stockQuantity }} left</span></span>
+            @if (lastAddedId() === p.id) { <span class="added-flash">Added</span> }
+          </button>
+        } @empty {
+          <div class="empty-catalog"><strong>No products found</strong><span>Try another search or category.</span></div>
+        }
+      </div>
     </div>
   </section>
 
-  <aside class="ticket">
-    <h2>Cart</h2>
-    <ul>
+  <aside class="ticket" aria-label="Current sale">
+    <header class="ticket-header"><div><p class="eyebrow">Current sale</p><h2>Cart</h2></div><span class="item-count">{{ cart.count() }} {{ cart.count() === 1 ? 'item' : 'items' }}</span></header>
+
+    <ul class="cart-lines">
       @for (line of cart.lines(); track line.product.id) {
         <li>
-          <div class="row">
-            <strong>{{ line.product.name }}</strong>
-            <button type="button" class="tiny" (click)="cart.remove(line.product.id)">Remove</button>
-          </div>
-          <div class="row nums">
-            <label>Qty
-              <input type="number" min="1" [max]="line.product.stockQuantity" [ngModel]="line.quantity"
-                     (ngModelChange)="cart.setQuantity(line.product.id, $event)" />
-            </label>
-            <label>Disc
-              <input type="number" min="0" step="0.01" [ngModel]="line.discountAmount"
-                     (ngModelChange)="cart.setDiscount(line.product.id, $event)" />
-            </label>
-            <span>{{ money(lineTotals(line.product.salePrice, line.quantity, line.discountAmount, line.product.taxRate).total) }}</span>
+          <div class="line-top"><strong>{{ line.product.name }}</strong><button type="button" class="remove" (click)="cart.remove(line.product.id)" [attr.aria-label]="'Remove ' + line.product.name">×</button></div>
+          <div class="line-meta"><span>{{ money(line.product.salePrice) }} each</span><strong>{{ money(lineTotals(line.product.salePrice, line.quantity, line.discountAmount, line.product.taxRate).total) }}</strong></div>
+          <div class="line-controls">
+            <label>Qty <input type="number" min="1" [max]="line.product.stockQuantity" [ngModel]="line.quantity"
+                     (ngModelChange)="cart.setQuantity(line.product.id, $event)" /></label>
+            <label>Discount <input type="number" min="0" step="0.01" [ngModel]="line.discountAmount"
+                     (ngModelChange)="cart.setDiscount(line.product.id, $event)" /></label>
           </div>
         </li>
       } @empty {
-        <li class="muted">Tap a product to add it.</li>
+        <li class="empty-cart"><span class="empty-icon">+</span><strong>Your cart is empty</strong><span>Select an item from the catalog to begin.</span></li>
       }
     </ul>
 
@@ -80,78 +97,51 @@
       <div><span>Subtotal</span><span>{{ money(promotionPreview().subtotal) }}</span></div>
       <div><span>Discount</span><span>{{ money(promotionPreview().discount) }}</span></div>
       <div><span>Tax</span><span>{{ money(promotionPreview().tax) }}</span></div>
-      <div class="grand"><span>Total</span><span>{{ money(promotionPreview().total) }}</span></div>
+      <div class="grand"><span>Total</span><strong>{{ money(promotionPreview().total) }}</strong></div>
     </div>
 
-    <label class="pay">Customer
-      <select [(ngModel)]="customerId" (ngModelChange)="loyaltyPointsToRedeem = 0">
-        <option [ngValue]="null">Walk-in customer</option>
-        @for (customer of customers(); track customer.id) {
-          <option [ngValue]="customer.id">{{ customer.name }} · {{ customer.loyaltyPoints }} pts</option>
-        }
-      </select>
-    </label>
-    <label class="pay">Coupon code
-      <input [(ngModel)]="couponCode" maxlength="40" autocomplete="off" />
-    </label>
-    @if (customerId) {
-      <label class="pay">Redeem loyalty points
-        <input type="number" min="0" [max]="customers().find(c => c.id === customerId)?.loyaltyPoints ?? 0"
-          [step]="loyaltyRules().redemptionPointsPerCurrencyUnit" [(ngModel)]="loyaltyPointsToRedeem" />
-      </label>
-    }
-    <label class="pay">Payment method
-      <select [(ngModel)]="payment">
-        <option value="Cash">Cash</option>
-        <option value="Card">Card</option>
-        <option value="Online">Online</option>
-      </select>
-    </label>
-    @if (payment !== 'Cash') {
-      <label class="pay">Provider
-        <select [(ngModel)]="paymentProvider">
-          <option value="">Select provider</option>
-          <option value="Demo terminal">Demo terminal</option>
-          <option value="Demo online">Demo online</option>
-          @if (payment === 'Online') {
-            <option value="Easypaisa">Easypaisa</option>
-            <option value="JazzCash">JazzCash</option>
-          }
-          <option value="Other">Other</option>
+    <div class="checkout-fields">
+      <label class="pay">Customer
+        <select [(ngModel)]="customerId" (ngModelChange)="loyaltyPointsToRedeem = 0">
+          <option [ngValue]="null">Walk-in customer</option>
+          @for (customer of customers(); track customer.id) { <option [ngValue]="customer.id">{{ customer.name }} · {{ customer.loyaltyPoints }} pts</option> }
         </select>
       </label>
-      <label class="pay">{{ payment === 'Card' ? 'Authorization / last-four reference' : 'Online transaction reference' }}
-        <input [(ngModel)]="paymentReference" maxlength="120" autocomplete="off"
-          [placeholder]="payment === 'Card' ? 'CARD-DEMO-001' : 'ONLINE-DEMO-001'" />
-      </label>
-      <p class="muted payment-note">Demo mode records the provider reference; it does not charge a real card.</p>
-    }
-    @if (payment === 'Cash') {
-      <label class="pay">Cash tendered
-        <input type="number" min="0" step="0.01" [(ngModel)]="cashTendered" />
-      </label>
-      <div class="change-due"><span>Change due</span><strong>{{ money(changeDue()) }}</strong></div>
-    }
+      <div class="field-pair">
+        <label class="pay">Coupon code <input [(ngModel)]="couponCode" maxlength="40" autocomplete="off" placeholder="Optional" /></label>
+        <label class="pay">Payment method
+          <select [(ngModel)]="payment"><option value="Cash">Cash</option><option value="Card">Card</option><option value="Online">Online</option></select>
+        </label>
+      </div>
+      @if (customerId) {
+        <label class="pay">Redeem loyalty points
+          <input type="number" min="0" [max]="customers().find(c => c.id === customerId)?.loyaltyPoints ?? 0"
+            [step]="loyaltyRules().redemptionPointsPerCurrencyUnit" [(ngModel)]="loyaltyPointsToRedeem" />
+        </label>
+      }
+      @if (payment !== 'Cash') {
+        <div class="field-pair"><label class="pay">Provider
+          <select [(ngModel)]="paymentProvider"><option value="">Select provider</option><option value="Demo terminal">Demo terminal</option><option value="Demo online">Demo online</option>@if (payment === 'Online') { <option value="Easypaisa">Easypaisa</option><option value="JazzCash">JazzCash</option> }<option value="Other">Other</option></select>
+        </label><label class="pay">Reference
+          <input [(ngModel)]="paymentReference" maxlength="120" autocomplete="off" [placeholder]="payment === 'Card' ? 'CARD-DEMO-001' : 'ONLINE-DEMO-001'" />
+        </label></div>
+        <p class="payment-note">Demo mode records the payment reference; it does not charge a real account.</p>
+      }
+      @if (payment === 'Cash') {
+        <div class="cash-row"><label class="pay">Cash tendered <input type="number" min="0" step="0.01" [(ngModel)]="cashTendered" /></label><div class="change-due"><span>Change due</span><strong>{{ money(changeDue()) }}</strong></div></div>
+      }
+    </div>
 
-    <button type="button" class="charge" [disabled]="busy() || cart.count() === 0" (click)="checkout()">
-      {{ busy() ? 'Recording…' : 'Record sale · ' + money(promotionPreview().total) }}
-    </button>
+    <button type="button" class="charge" [disabled]="busy() || cart.count() === 0" (click)="checkout()"><span>{{ busy() ? 'Recording sale…' : 'Charge' }}</span><strong>{{ money(promotionPreview().total) }}</strong></button>
   </aside>
 </div>
 
 @if (lastSale(); as sale) {
   <div class="modal" (click)="lastSale.set(null)">
     <div class="card" (click)="$event.stopPropagation()">
-      <h2>Sale complete</h2>
-      <p>{{ sale.invoiceNumber }} · {{ money(sale.totalAmount) }}</p>
-      @if (lastChangeDue() !== null) {
-        <p>Change due: {{ money(lastChangeDue() ?? 0) }}</p>
-      }
-      <div class="actions">
-        <button type="button" (click)="printReceipt()">Print / PDF</button>
-        <button type="button" class="ghost" (click)="downloadInvoice()">Download invoice PDF</button>
-        <button type="button" class="ghost" (click)="lastSale.set(null)">Close</button>
-      </div>
+      <p class="eyebrow">Payment recorded</p><h2>Sale complete</h2><p>{{ sale.invoiceNumber }} · {{ money(sale.totalAmount) }}</p>
+      @if (lastChangeDue() !== null) { <p>Change due: {{ money(lastChangeDue() ?? 0) }}</p> }
+      <div class="actions"><button type="button" (click)="printReceipt()">Print / PDF</button><button type="button" class="ghost" (click)="downloadInvoice()">Download invoice PDF</button><button type="button" class="ghost" (click)="lastSale.set(null)">Close</button></div>
     </div>
   </div>
 }
