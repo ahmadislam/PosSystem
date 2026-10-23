@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PosApi } from '../../core/api/pos-api';
 import { CartStore } from '../../core/cart/cart.store';
@@ -47,6 +47,7 @@ export class Pos implements OnInit {
   readonly lastSale = signal<SaleDto | null>(null);
   readonly lastChangeDue = signal<number | null>(null);
   readonly lastAddedId = signal<number | null>(null);
+  @ViewChild('productSearch') private productSearch?: ElementRef<HTMLInputElement>;
 
   ngOnInit(): void {
     this.api.categories().subscribe({ next: (c) => this.categories.set(c) });
@@ -77,6 +78,36 @@ export class Pos implements OnInit {
   searchProducts(): void {
     this.page.set(1);
     this.loadProducts();
+  }
+
+  searchOrScan(): void {
+    const query = this.search.trim();
+    if (!query) {
+      this.searchProducts();
+      return;
+    }
+    this.api.productBySku(query.toUpperCase()).subscribe({
+      next: (product) => {
+        const message = this.cart.add(product);
+        if (message) this.toast.show(message, 'warn');
+        else this.confirmAdded(product);
+        this.search = '';
+      },
+      error: (error) => {
+        if (error.status === 404) this.searchProducts();
+        else this.toast.show(apiError(error), 'err');
+      },
+    });
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  focusSearchShortcut(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement | null;
+    const isEditing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+    if (event.key === '/' && !isEditing) {
+      event.preventDefault();
+      this.productSearch?.nativeElement.focus();
+    }
   }
 
   setCategory(categoryId: number | null): void {

@@ -1,5 +1,5 @@
 <div class="shell">
-  <aside>
+  <aside class="sidebar">
     <div class="brand">
       <span class="mark">POS</span>
       <div>
@@ -8,17 +8,17 @@
       </div>
     </div>
 
-    <nav>
-      <a routerLink="/pos" routerLinkActive="on">Register</a>
-      <a routerLink="/shifts" routerLinkActive="on">Shift</a>
-      <a routerLink="/sales" routerLinkActive="on">Sales</a>
+    <nav aria-label="Main navigation">
+      <a routerLink="/pos" routerLinkActive="on"><span aria-hidden="true">⌘</span> Register</a>
+      <a routerLink="/shifts" routerLinkActive="on"><span aria-hidden="true">◷</span> Shift</a>
+      <a routerLink="/sales" routerLinkActive="on"><span aria-hidden="true">↗</span> Sales</a>
       @if (auth.isStaff()) {
-        <a routerLink="/dashboard" routerLinkActive="on">Dashboard</a>
-        <a routerLink="/inventory" routerLinkActive="on">Inventory</a>
-        <a routerLink="/purchasing" routerLinkActive="on">Suppliers &amp; purchasing</a>
-        <a routerLink="/customers" routerLinkActive="on">Customers</a>
-        <a routerLink="/history" routerLinkActive="on">History</a>
-        <a routerLink="/settings" routerLinkActive="on">Settings</a>
+        <a routerLink="/dashboard" routerLinkActive="on"><span aria-hidden="true">◫</span> Dashboard</a>
+        <a routerLink="/inventory" routerLinkActive="on"><span aria-hidden="true">□</span> Inventory</a>
+        <a routerLink="/purchasing" routerLinkActive="on"><span aria-hidden="true">▣</span> Suppliers &amp; purchasing</a>
+        <a routerLink="/customers" routerLinkActive="on"><span aria-hidden="true">◉</span> Customers</a>
+        <a routerLink="/history" routerLinkActive="on"><span aria-hidden="true">≋</span> History</a>
+        <a routerLink="/settings" routerLinkActive="on"><span aria-hidden="true">⚙</span> Settings</a>
       }
     </nav>
 
@@ -32,7 +32,7 @@
     </div>
   </aside>
 
-  <main>
+  <main class="workspace">
     @if (toast.message(); as msg) {
       <div class="toast" [class.err]="toast.kind() === 'err'" [class.warn]="toast.kind() === 'warn'">
         {{ msg }}

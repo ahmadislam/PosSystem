@@ -17,16 +17,12 @@
   <section class="catalog-panel" aria-label="Product catalog">
     <div class="catalog-tools">
       <label class="search-field">
-        <span class="sr-only">Search products</span>
+        <span class="sr-only">Search products or scan a barcode</span>
         <span aria-hidden="true">⌕</span>
-        <input placeholder="Search products or SKU" [(ngModel)]="search" (keyup.enter)="searchProducts()" />
+        <input #productSearch autofocus placeholder="Search products, scan a barcode, or enter a SKU" [(ngModel)]="search" (keyup.enter)="searchOrScan()" />
+        <kbd aria-hidden="true">/</kbd>
       </label>
       <button type="button" class="search-button" (click)="searchProducts()">Search</button>
-      <label class="scan-field">
-        <span class="sr-only">Scan barcode or SKU</span>
-        <input aria-label="Scan barcode or SKU" placeholder="Scan barcode / SKU" [(ngModel)]="barcode"
-          (keyup.enter)="scanBarcode()" autocomplete="off" />
-      </label>
     </div>
 
     <div class="category-rail" aria-label="Product categories">
