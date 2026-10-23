@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, HostListener, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
@@ -17,6 +17,19 @@ export class Login {
   username = 'admin';
   password = '';
   showPassword = false;
+  readonly introVisible = signal(true);
+
+  constructor() {
+    window.setTimeout(() => this.introVisible.set(false), 1500);
+  }
+
+  @HostListener('document:pointermove', ['$event'])
+  trackPointer(event: PointerEvent): void {
+    const x = (event.clientX / Math.max(window.innerWidth, 1) - 0.5) * 2;
+    const y = (event.clientY / Math.max(window.innerHeight, 1) - 0.5) * 2;
+    document.documentElement.style.setProperty('--pointer-x', x.toFixed(3));
+    document.documentElement.style.setProperty('--pointer-y', y.toFixed(3));
+  }
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
 

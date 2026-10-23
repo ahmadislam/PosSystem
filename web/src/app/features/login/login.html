@@ -1,17 +1,21 @@
 <main class="login-shell">
+  @if (introVisible()) {
+    <div class="cinematic-intro" aria-hidden="true"><span class="intro-mark">⌁</span><strong>Counter</strong><small>POINT OF SALE</small></div>
+  }
   <section class="brand-stage" aria-label="POS system preview">
     <div class="glow glow-one"></div><div class="glow glow-two"></div>
     <div class="brand-lockup"><span class="rabbit" aria-hidden="true">⌁</span><span>Counter</span><small>POINT OF SALE</small></div>
     <div class="floating-screen screen-back" aria-hidden="true"><span class="screen-dot"></span><span class="screen-dot"></span><span class="screen-dot"></span><div class="screen-title">Today’s register</div><div class="screen-total">$1,248.50</div><div class="screen-bars"><i></i><i></i><i></i><i></i><i></i></div></div>
     <div class="floating-screen screen-front" aria-hidden="true"><div class="screen-top"><span class="mini-logo">P</span><span>Live sales</span><b>●</b></div><div class="sale-row"><span>House Coffee</span><strong>$8.50</strong></div><div class="sale-row"><span>Chocolate Bar</span><strong>$1.25</strong></div><div class="sale-row muted-row"><span>Payment completed</span><strong>✓</strong></div></div>
-    <p class="stage-caption">One calm workspace for every sale.</p>
+    <div class="activity-pill"><span class="pulse"></span> Register ready <b>Live</b></div>
+    <p class="stage-caption">Everything you need at the register.</p>
   </section>
   <section class="form-stage">
   <form (ngSubmit)="submit()" class="login-card">
     <div class="mobile-brand"><span class="rabbit" aria-hidden="true">⌁</span><span>Counter</span></div>
     <p class="eyebrow">Welcome back</p>
     <h1>Sign in to your register</h1>
-    <p class="hint">Use your staff account to access sales and inventory.</p>
+    <p class="hint">Sign in to manage sales, stock, and customers.</p>
 
     <label>
       Username
