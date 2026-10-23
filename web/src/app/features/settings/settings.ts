@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { PosApi } from '../../core/api/pos-api';
 import { AuthService } from '../../core/auth/auth.service';
 import { apiError } from '../../core/http/api-error';
-import { EmailSettingsDto, StaffDto, UserRole } from '../../core/models';
+import { BackgroundJobStatusDto, EmailSettingsDto, LowStockAlertDto, StaffDto, UserRole } from '../../core/models';
 import { Toast } from '../../core/ui/toast';
 
 @Component({
@@ -19,6 +19,8 @@ export class Settings implements OnInit {
   readonly auth = inject(AuthService);
   readonly staff = signal<StaffDto[]>([]);
   readonly email = signal<EmailSettingsDto | null>(null);
+  readonly jobStatus = signal<BackgroundJobStatusDto | null>(null);
+  readonly lowStockAlerts = signal<LowStockAlertDto[]>([]);
   readonly loading = signal(false);
   readonly savingEmail = signal(false);
   readonly testingEmail = signal(false);
@@ -33,6 +35,14 @@ export class Settings implements OnInit {
 
   ngOnInit(): void {
     this.loadEmailSettings();
+    this.api.backgroundJobStatus().subscribe({
+      next: (status) => this.jobStatus.set(status),
+      error: (error) => this.fail(error),
+    });
+    this.api.lowStockAlerts().subscribe({
+      next: (alerts) => this.lowStockAlerts.set(alerts),
+      error: (error) => this.fail(error),
+    });
     if (this.auth.role() === 'Admin') this.loadStaff();
   }
 

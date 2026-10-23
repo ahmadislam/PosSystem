@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using PosSystem.Application.Common;
 using PosSystem.Application.Dtos;
@@ -46,6 +47,7 @@ public class ShiftService(IAppDbContext db, ICurrentUser current) : IShiftServic
     public async Task<ShiftDto> BeginCloseAsync(CancellationToken ct = default)
     {
         var userId = RequireUser();
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
         var shiftId = await db.Database
             .SqlQuery<int>($"SELECT \"Id\" AS \"Value\" FROM \"CashierShifts\" WHERE \"CashierId\" = {userId} AND \"Status\" <> {(int)ShiftStatus.Closed} FOR UPDATE")
             .SingleOrDefaultAsync(ct);
@@ -62,6 +64,7 @@ public class ShiftService(IAppDbContext db, ICurrentUser current) : IShiftServic
         shift.ExpectedCash = shift.OpeningCash + cashSales - cashRefunds;
         shift.Status = ShiftStatus.PendingClose;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return ToDto(shift);
     }
 

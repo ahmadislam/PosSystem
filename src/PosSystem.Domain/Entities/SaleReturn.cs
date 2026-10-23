@@ -13,6 +13,7 @@ public class SaleReturn : BaseEntity
     public User ProcessedByUser { get; set; } = null!;
     public DateTime RefundDate { get; set; } = DateTime.UtcNow;
     public PaymentMethod RefundMethod { get; set; }
+    public string? Reason { get; set; }
     public decimal Subtotal { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }

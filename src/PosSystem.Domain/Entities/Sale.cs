@@ -6,6 +6,8 @@ namespace PosSystem.Domain.Entities;
 public class Sale : BaseEntity, ISoftDelete
 {
     public string InvoiceNumber { get; set; } = string.Empty;
+    public string? IdempotencyKey { get; set; }
+    public string? RequestHash { get; set; }
     public int CashierId { get; set; }
     public User Cashier { get; set; } = null!;
     public int ShiftId { get; set; }

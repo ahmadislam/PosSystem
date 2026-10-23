@@ -10,9 +10,12 @@ namespace PosSystem.Api.Controllers;
 public class SalesController(ISaleService sales, ISaleReturnService returns) : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<SaleDto>> Create(CreateSaleRequest request, CancellationToken ct)
+    public async Task<ActionResult<SaleDto>> Create(
+        CreateSaleRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken ct)
     {
-        var dto = await sales.CreateAsync(request, ct);
+        var dto = await sales.CreateAsync(request, idempotencyKey ?? string.Empty, ct);
         return CreatedAtAction(nameof(Get), new { id = dto.Id }, dto);
     }
 

@@ -14,15 +14,24 @@
 <div class="pos">
   <section>
     <div class="filters">
-      <input placeholder="Search SKU or name" [(ngModel)]="search" (keyup.enter)="loadProducts()" />
-      <select [(ngModel)]="categoryId" (change)="loadProducts()">
+      <input placeholder="Search products by name or SKU" [(ngModel)]="search" (keyup.enter)="searchProducts()" />
+      <select [(ngModel)]="categoryId" (change)="searchProducts()">
         <option [ngValue]="null">All categories</option>
         @for (c of categories(); track c.id) {
           <option [ngValue]="c.id">{{ c.name }}</option>
         }
       </select>
-      <button type="button" class="ghost" (click)="loadProducts()">Search</button>
+      <button type="button" class="ghost" (click)="searchProducts()">Search</button>
+      <input aria-label="Scan barcode or SKU" placeholder="Scan barcode / exact SKU" [(ngModel)]="barcode"
+        (keyup.enter)="scanBarcode()" autocomplete="off" />
     </div>
+    @if (totalPages() > 1) {
+      <nav class="catalog-pages" aria-label="Product pages">
+        <button type="button" class="ghost" [disabled]="page() <= 1" (click)="movePage(-1)">Previous</button>
+        <span>Page {{ page() }} of {{ totalPages() }}</span>
+        <button type="button" class="ghost" [disabled]="page() >= totalPages()" (click)="movePage(1)">Next</button>
+      </nav>
+    }
 
     <div class="grid">
       @for (p of products(); track p.id) {
@@ -71,16 +80,22 @@
       <div class="grand"><span>Total</span><span>{{ money(cart.preview().total) }}</span></div>
     </div>
 
-    <label class="pay">Payment
+    <label class="pay">Payment method recorded (no gateway collection)
       <select [(ngModel)]="payment">
         <option value="Cash">Cash</option>
         <option value="Card">Card</option>
         <option value="Online">Online</option>
       </select>
     </label>
+    @if (payment === 'Cash') {
+      <label class="pay">Cash tendered
+        <input type="number" min="0" step="0.01" [(ngModel)]="cashTendered" />
+      </label>
+      <div class="change-due"><span>Change due</span><strong>{{ money(changeDue()) }}</strong></div>
+    }
 
     <button type="button" class="charge" [disabled]="busy() || cart.count() === 0" (click)="checkout()">
-      {{ busy() ? 'Recording…' : 'Charge ' + money(cart.preview().total) }}
+      {{ busy() ? 'Recording…' : 'Record sale · ' + money(cart.preview().total) }}
     </button>
   </aside>
 </div>
@@ -90,8 +105,12 @@
     <div class="card" (click)="$event.stopPropagation()">
       <h2>Sale complete</h2>
       <p>{{ sale.invoiceNumber }} · {{ money(sale.totalAmount) }}</p>
+      @if (lastChangeDue() !== null) {
+        <p>Change due: {{ money(lastChangeDue() ?? 0) }}</p>
+      }
       <div class="actions">
         <button type="button" (click)="printReceipt()">Print / PDF</button>
+        <button type="button" class="ghost" (click)="downloadInvoice()">Download invoice PDF</button>
         <button type="button" class="ghost" (click)="lastSale.set(null)">Close</button>
       </div>
     </div>

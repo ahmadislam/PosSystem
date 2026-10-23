@@ -6,3 +6,4 @@ public enum SaleStatus { Completed, PartiallyReturned, Refunded }
 public enum StockMovementType { Purchase, Sale, Return, Adjustment }
 public enum ShiftStatus { Open, PendingClose, Closed }
 public enum AuditAction { Create, Update, Delete }
+public enum PurchaseOrderStatus { Draft, Ordered, Received, Cancelled }

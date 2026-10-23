@@ -29,8 +29,6 @@ if (builder.Environment.IsProduction())
 var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
 if (!EmailOptions.IsValid(emailOptions))
     throw new InvalidOperationException("Email SMTP configuration is invalid. Verify host, port, sender address, TLS settings, and SMTP credential pairing.");
-if (builder.Environment.IsProduction() && !emailOptions.Enabled)
-    throw new InvalidOperationException("SMTP email delivery must be configured and enabled in Production.");
 
 builder.Services.AddSingleton(jwt);
 builder.Services.AddHttpContextAccessor();
@@ -99,14 +97,20 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 await DbSeeder.SeedAsync(app.Services, app.Configuration);
+var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
+recurringJobs.AddOrUpdate<LowStockAlertDispatcher>(
+    "low-stock-alert-dispatch",
+    job => job.DispatchAsync(CancellationToken.None),
+    Cron.Minutely,
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 if (app.Configuration.GetValue<bool>("Email:Enabled"))
 {
-    RecurringJob.AddOrUpdate<DailySalesReportJob>(
+    recurringJobs.AddOrUpdate<DailySalesReportJob>(
         "daily-sales-summary",
         job => job.SendAsync(CancellationToken.None),
         Cron.Daily,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
-    RecurringJob.AddOrUpdate<DailySalesReportJob>(
+    recurringJobs.AddOrUpdate<DailySalesReportJob>(
         "monthly-sales-summary",
         job => job.SendMonthlyAsync(CancellationToken.None),
         "15 0 1 * *",
@@ -114,8 +118,8 @@ if (app.Configuration.GetValue<bool>("Email:Enabled"))
 }
 else
 {
-    RecurringJob.RemoveIfExists("daily-sales-summary");
-    RecurringJob.RemoveIfExists("monthly-sales-summary");
+    recurringJobs.RemoveIfExists("daily-sales-summary");
+    recurringJobs.RemoveIfExists("monthly-sales-summary");
     app.Logger.LogInformation("Email delivery is disabled; the daily sales report is not scheduled.");
 }
 app.Run();

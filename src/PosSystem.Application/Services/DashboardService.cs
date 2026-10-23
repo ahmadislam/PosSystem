@@ -27,12 +27,20 @@ public class DashboardService(IAppDbContext db) : IDashboardService
         }
 
         var totalSales = await sales.CountAsync(ct);
-        var revenue = await sales.SumAsync(s => (decimal?)s.TotalAmount, ct) ?? 0m;
-        var dailySales = await sales
+        var grossSales = await sales.SumAsync(s => (decimal?)s.TotalAmount, ct) ?? 0m;
+        var refundQuery = db.SaleReturns.AsNoTracking().AsQueryable();
+        if (from.HasValue)
+            refundQuery = refundQuery.Where(r => r.RefundDate >= DateTime.SpecifyKind(from.Value.Date, DateTimeKind.Utc));
+        if (to.HasValue)
+            refundQuery = refundQuery.Where(r => r.RefundDate < DateTime.SpecifyKind(to.Value.Date.AddDays(1), DateTimeKind.Utc));
+        var refunds = await refundQuery.SumAsync(r => (decimal?)r.TotalAmount, ct) ?? 0m;
+        var netRevenue = grossSales - refunds;
+        var dailyTotals = await sales
             .GroupBy(s => s.SaleDate.Date)
-            .Select(g => new DailySalesDto(g.Key, g.Sum(s => s.TotalAmount)))
+            .Select(g => new { Date = g.Key, GrossSales = g.Sum(s => s.TotalAmount) })
             .OrderBy(d => d.Date)
             .ToListAsync(ct);
+        var dailySales = dailyTotals.Select(d => new DailySalesDto(d.Date, d.GrossSales)).ToList();
         var monthlyTotals = await sales
             .GroupBy(s => new { s.SaleDate.Year, s.SaleDate.Month })
             .Select(g => new { g.Key.Year, g.Key.Month, Revenue = g.Sum(s => s.TotalAmount) })
@@ -46,25 +54,38 @@ public class DashboardService(IAppDbContext db) : IDashboardService
         var saleItems = from sale in sales
                         join item in db.SaleItems.AsNoTracking() on sale.Id equals item.SaleId
                         select item;
-        var topSellingProducts = await saleItems
+        var topProductTotals = await saleItems
             .GroupBy(item => new { item.Sku, item.ProductName })
-            .Select(group => new TopSellingProductDto(
-                group.Key.Sku, group.Key.ProductName, group.Sum(item => item.Quantity), group.Sum(item => item.LineTotal)))
+            .Select(group => new
+            {
+                group.Key.Sku,
+                group.Key.ProductName,
+                QuantitySold = group.Sum(item => item.Quantity),
+                Revenue = group.Sum(item => item.LineTotal)
+            })
             .OrderByDescending(product => product.QuantitySold)
             .ThenByDescending(product => product.Revenue)
             .Take(5)
             .ToListAsync(ct);
+        var topSellingProducts = topProductTotals.Select(product => new TopSellingProductDto(
+            product.Sku, product.ProductName, product.QuantitySold, product.Revenue)).ToList();
 
-        var salesByCategory = await (
+        var categoryTotals = await (
                 from item in saleItems
                 join product in db.Products.IgnoreQueryFilters().AsNoTracking() on item.ProductId equals product.Id
                 join category in db.Categories.IgnoreQueryFilters().AsNoTracking() on product.CategoryId equals category.Id
                 group item by new { category.Id, category.Name } into categoryGroup
                 orderby categoryGroup.Sum(item => item.LineTotal) descending
-                select new CategorySalesDto(
-                    categoryGroup.Key.Id, categoryGroup.Key.Name,
-                    categoryGroup.Sum(item => item.Quantity), categoryGroup.Sum(item => item.LineTotal)))
+                select new
+                {
+                    categoryGroup.Key.Id,
+                    categoryGroup.Key.Name,
+                    QuantitySold = categoryGroup.Sum(item => item.Quantity),
+                    Revenue = categoryGroup.Sum(item => item.LineTotal)
+                })
             .ToListAsync(ct);
+        var salesByCategory = categoryTotals.Select(category => new CategorySalesDto(
+            category.Id, category.Name, category.QuantitySold, category.Revenue)).ToList();
         var recentSales = await sales
             .Include(s => s.Items)
             .OrderByDescending(s => s.SaleDate)
@@ -83,7 +104,10 @@ public class DashboardService(IAppDbContext db) : IDashboardService
 
         return new DashboardSummaryDto(
             totalSales,
-            revenue,
+            grossSales,
+            grossSales,
+            refunds,
+            netRevenue,
             lowStockCount,
             dailySales,
             monthlyRevenue,
@@ -101,6 +125,7 @@ public class DashboardService(IAppDbContext db) : IDashboardService
 
     private static ProductDto ToProductDto(Product product) => new(
         product.Id, product.Sku, product.Name, product.Description, product.CategoryId, product.Category.Name,
+        product.DefaultSupplierId,
         product.CostPrice, product.SalePrice, product.TaxRate, product.StockQuantity, product.MinStockThreshold,
         product.IsActive, product.StockQuantity <= product.MinStockThreshold);
 }

@@ -6,16 +6,23 @@ import {
   CategoryDto,
   AuditAction,
   AuditLogDto,
+  BackgroundJobStatusDto,
   DashboardSummaryDto,
   EmailSettingsDto,
+  LowStockAlertDto,
   PagedResult,
   PaymentMethod,
   ProductDto,
   ProductRequest,
+  PurchaseOrderDto,
+  PurchaseOrderLineRequest,
+  PurchaseOrderStatus,
   SaleDto,
   SaleReturnDto,
   ShiftDto,
   StaffDto,
+  SupplierDto,
+  SupplierRequest,
   StockMovementDto,
   UserRole,
 } from '../models';
@@ -68,6 +75,48 @@ export class PosApi {
     return this.http.delete<void>(`${this.root}/api/products/${id}`);
   }
 
+  suppliers(): Observable<SupplierDto[]> {
+    return this.http.get<SupplierDto[]>(`${this.root}/api/suppliers`);
+  }
+
+  createSupplier(body: SupplierRequest): Observable<SupplierDto> {
+    return this.http.post<SupplierDto>(`${this.root}/api/suppliers`, body);
+  }
+
+  updateSupplier(id: number, body: SupplierRequest): Observable<SupplierDto> {
+    return this.http.put<SupplierDto>(`${this.root}/api/suppliers/${id}`, body);
+  }
+
+  deleteSupplier(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.root}/api/suppliers/${id}`);
+  }
+
+  purchaseOrders(status?: PurchaseOrderStatus): Observable<PagedResult<PurchaseOrderDto>> {
+    let params = new HttpParams().set('page', '1').set('pageSize', '100');
+    if (status) params = params.set('status', status);
+    return this.http.get<PagedResult<PurchaseOrderDto>>(`${this.root}/api/purchase-orders`, { params });
+  }
+
+  createPurchaseOrder(supplierId: number, items: PurchaseOrderLineRequest[]): Observable<PurchaseOrderDto> {
+    return this.http.post<PurchaseOrderDto>(`${this.root}/api/purchase-orders`, { supplierId, items });
+  }
+
+  updatePurchaseOrder(id: number, supplierId: number, items: PurchaseOrderLineRequest[]): Observable<PurchaseOrderDto> {
+    return this.http.put<PurchaseOrderDto>(`${this.root}/api/purchase-orders/${id}`, { supplierId, items });
+  }
+
+  orderPurchaseOrder(id: number): Observable<PurchaseOrderDto> {
+    return this.http.post<PurchaseOrderDto>(`${this.root}/api/purchase-orders/${id}/order`, {});
+  }
+
+  receivePurchaseOrder(id: number): Observable<PurchaseOrderDto> {
+    return this.http.post<PurchaseOrderDto>(`${this.root}/api/purchase-orders/${id}/receive`, {});
+  }
+
+  cancelPurchaseOrder(id: number): Observable<PurchaseOrderDto> {
+    return this.http.post<PurchaseOrderDto>(`${this.root}/api/purchase-orders/${id}/cancel`, {});
+  }
+
   currentShift(): Observable<ShiftDto | null> {
     return this.http
       .get<ShiftDto>(`${this.root}/api/shifts/current`, { observe: 'response' })
@@ -86,8 +135,16 @@ export class PosApi {
     return this.http.post<ShiftDto>(`${this.root}/api/shifts/close`, { closingCash });
   }
 
-  createSale(paymentMethod: PaymentMethod, items: { productId: number; quantity: number; discountAmount: number }[]): Observable<SaleDto> {
-    return this.http.post<SaleDto>(`${this.root}/api/sales`, { paymentMethod, items });
+  createSale(
+    paymentMethod: PaymentMethod,
+    items: { productId: number; quantity: number; discountAmount: number }[],
+    idempotencyKey: string,
+  ): Observable<SaleDto> {
+    return this.http.post<SaleDto>(
+      `${this.root}/api/sales`,
+      { paymentMethod, items },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
   }
 
   getSale(id: number): Observable<SaleDto> {
@@ -102,9 +159,11 @@ export class PosApi {
     saleId: number,
     refundMethod: PaymentMethod,
     items: { saleItemId: number; quantity: number }[],
+    reason?: string,
   ): Observable<SaleReturnDto> {
     return this.http.post<SaleReturnDto>(`${this.root}/api/sales/${saleId}/returns`, {
       refundMethod,
+      reason,
       items,
     });
   }
@@ -186,5 +245,13 @@ export class PosApi {
 
   testEmail(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.root}/api/email-settings/test`, {});
+  }
+
+  backgroundJobStatus(): Observable<BackgroundJobStatusDto> {
+    return this.http.get<BackgroundJobStatusDto>(`${this.root}/api/operations/jobs`);
+  }
+
+  lowStockAlerts(): Observable<LowStockAlertDto[]> {
+    return this.http.get<LowStockAlertDto[]>(`${this.root}/api/operations/low-stock-alerts`);
   }
 }

@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PosApi } from '../../core/api/pos-api';
 import { apiError } from '../../core/http/api-error';
-import { CategoryDto, ProductDto, ProductRequest, money } from '../../core/models';
+import { CategoryDto, ProductDto, ProductRequest, SupplierDto, money } from '../../core/models';
 import { Toast } from '../../core/ui/toast';
 
 const emptyForm = (): ProductRequest => ({
@@ -10,6 +10,7 @@ const emptyForm = (): ProductRequest => ({
   name: '',
   description: '',
   categoryId: 0,
+  defaultSupplierId: null,
   costPrice: 0,
   salePrice: 0,
   taxRate: 0,
@@ -32,6 +33,7 @@ export class Inventory implements OnInit {
   search = '';
   lowStockOnly = false;
   readonly categories = signal<CategoryDto[]>([]);
+  readonly suppliers = signal<SupplierDto[]>([]);
   readonly products = signal<ProductDto[]>([]);
   readonly total = signal(0);
   readonly page = signal(1);
@@ -47,6 +49,10 @@ export class Inventory implements OnInit {
 
   ngOnInit(): void {
     this.api.categories().subscribe({ next: (c) => this.categories.set(c) });
+    this.api.suppliers().subscribe({
+      next: (s) => this.suppliers.set(s.filter((supplier) => supplier.isActive)),
+      error: (e) => this.toast.show(apiError(e), 'err'),
+    });
     this.load();
   }
 
@@ -109,6 +115,7 @@ export class Inventory implements OnInit {
       name: p.name,
       description: p.description,
       categoryId: p.categoryId,
+      defaultSupplierId: p.defaultSupplierId,
       costPrice: p.costPrice,
       salePrice: p.salePrice,
       taxRate: p.taxRate,

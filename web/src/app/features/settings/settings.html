@@ -36,6 +36,32 @@
   }
 </section>
 
+<section class="panel">
+  <h2>Background job queue</h2>
+  @if (jobStatus(); as jobs) {
+    <p>Failed: <strong>{{ jobs.failed }}</strong> · Enqueued: {{ jobs.enqueued }} · Scheduled: {{ jobs.scheduled }}</p>
+    @if (jobs.failed > 0) {
+      <p class="muted">Failed job details remain in the protected Hangfire storage. Review service logs and retry jobs after resolving the cause.</p>
+    }
+  } @else {
+    <p class="muted">Loading protected job status…</p>
+  }
+</section>
+
+<section class="panel">
+  <h2>Low-stock alerts</h2>
+  @for (alert of lowStockAlerts(); track alert.id) {
+    <p>
+      <strong>{{ alert.sku }} · {{ alert.productName }}</strong> —
+      {{ alert.stockQuantity }} in stock (threshold {{ alert.minStockThreshold }}) ·
+      @if (alert.resolvedAt) { Resolved } @else if (alert.sentAt) { Email sent } @else { Pending email }
+      · Attempts: {{ alert.deliveryAttempts }}
+    </p>
+  } @empty {
+    <p class="muted">No low-stock alert records.</p>
+  }
+</section>
+
 @if (auth.role() === 'Admin') {
   <section class="panel">
     <h2>Staff accounts</h2>

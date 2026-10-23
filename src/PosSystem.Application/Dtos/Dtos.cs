@@ -52,6 +52,7 @@ public class ProductRequest
     [Required, StringLength(200)] public string Name { get; set; } = string.Empty;
     [StringLength(1000)] public string? Description { get; set; }
     [Range(1, int.MaxValue)] public int CategoryId { get; set; }
+    [Range(1, int.MaxValue)] public int? DefaultSupplierId { get; set; }
     [Range(0, 1000000000)] public decimal CostPrice { get; set; }
     [Range(0, 1000000000)] public decimal SalePrice { get; set; }
     [Range(0, 100)] public decimal TaxRate { get; set; }
@@ -66,8 +67,40 @@ public class StockAdjustRequest
     [Required, StringLength(300)] public string Note { get; set; } = string.Empty;
 }
 public record ProductDto(int Id, string Sku, string Name, string? Description, int CategoryId, string CategoryName,
-    decimal CostPrice, decimal SalePrice, decimal TaxRate, int StockQuantity, int MinStockThreshold,
+    int? DefaultSupplierId, decimal CostPrice, decimal SalePrice, decimal TaxRate, int StockQuantity, int MinStockThreshold,
     bool IsActive, bool IsLowStock);
+
+// ---- Suppliers ----
+public class SupplierRequest
+{
+    [Required, StringLength(200, MinimumLength = 1)] public string Name { get; set; } = string.Empty;
+    [StringLength(200)] public string? ContactName { get; set; }
+    [EmailAddress, StringLength(200)] public string? Email { get; set; }
+    [StringLength(50)] public string? Phone { get; set; }
+    [StringLength(500)] public string? Address { get; set; }
+    [StringLength(1000)] public string? Notes { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+public record SupplierDto(int Id, string Name, string? ContactName, string? Email, string? Phone,
+    string? Address, string? Notes, bool IsActive);
+
+// ---- Purchase orders ----
+public class PurchaseOrderLineRequest
+{
+    [Range(1, int.MaxValue)] public int ProductId { get; set; }
+    [Range(1, 1000000)] public int Quantity { get; set; }
+    [Range(0, 1000000000)] public decimal UnitCost { get; set; }
+}
+public class PurchaseOrderRequest
+{
+    [Range(1, int.MaxValue)] public int SupplierId { get; set; }
+    [Required, MinLength(1), MaxLength(200)] public List<PurchaseOrderLineRequest> Items { get; set; } = [];
+}
+public record PurchaseOrderItemDto(int Id, int ProductId, string Sku, string ProductName,
+    int Quantity, decimal UnitCost, decimal LineTotal);
+public record PurchaseOrderDto(int Id, int SupplierId, string SupplierName, int CreatedByUserId,
+    PurchaseOrderStatus Status, DateTime CreatedAt, DateTime? OrderedAt, DateTime? ReceivedAt,
+    decimal TotalCost, IReadOnlyList<PurchaseOrderItemDto> Items);
 
 // ---- Shifts ----
 public class OpenShiftRequest { [Range(0, 1000000000)] public decimal OpeningCash { get; set; } }
@@ -101,12 +134,13 @@ public class SaleReturnLineRequest
 public class CreateSaleReturnRequest
 {
     public PaymentMethod RefundMethod { get; set; }
+    [MaxLength(500)] public string? Reason { get; set; }
     [Required, MinLength(1)] public List<SaleReturnLineRequest> Items { get; set; } = new();
 }
 public record SaleReturnItemDto(int SaleItemId, int ProductId, string Sku, string ProductName, int Quantity,
     decimal UnitPrice, decimal Subtotal, decimal DiscountAmount, decimal TaxAmount, decimal LineTotal);
 public record SaleReturnDto(int Id, int SaleId, int ShiftId, int ProcessedByUserId, DateTime RefundDate,
-    PaymentMethod RefundMethod, decimal Subtotal, decimal DiscountAmount, decimal TaxAmount, decimal TotalAmount,
+    PaymentMethod RefundMethod, string? Reason, decimal Subtotal, decimal DiscountAmount, decimal TaxAmount, decimal TotalAmount,
     IReadOnlyList<SaleReturnItemDto> Items);
 
 // ---- Dashboard ----
@@ -117,6 +151,9 @@ public record CategorySalesDto(int CategoryId, string CategoryName, int Quantity
 public record DashboardSummaryDto(
     int TotalSales,
     decimal Revenue,
+    decimal GrossSales,
+    decimal Refunds,
+    decimal NetRevenue,
     int LowStockCount,
     IReadOnlyList<DailySalesDto> DailySales,
     IReadOnlyList<MonthlyRevenueDto> MonthlyRevenue,
@@ -131,3 +168,6 @@ public record AuditLogDto(int Id, DateTime Timestamp, int? UserId, string? Usern
 public record StockMovementDto(int Id, DateTime CreatedAt, int ProductId, string Sku, string ProductName,
     int CreatedByUserId, string? Username, StockMovementType Type, int QuantityChange,
     string? ReferenceType, int? ReferenceId, string? Note);
+public record LowStockAlertDto(int Id, string Sku, string ProductName, int StockQuantity,
+    int MinStockThreshold, DateTime DetectedAt, DateTime? SentAt, DateTime? ResolvedAt,
+    DateTime? LastAttemptAt, int DeliveryAttempts, string? LastError);

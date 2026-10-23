@@ -17,7 +17,8 @@ public class JwtTokenService(JwtSettings settings) : ITokenService
         {
             new Claim("sub", user.Id.ToString()),
             new Claim("name", user.Username),
-            new Claim("role", user.Role.ToString())
+            new Claim("role", user.Role.ToString()),
+            new Claim(AuthorizationStamp.ClaimType, AuthorizationStamp.Create(user, settings.Key))
         };
         var creds = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Key)), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(settings.Issuer, settings.Audience, claims, expires: expiresAt, signingCredentials: creds);

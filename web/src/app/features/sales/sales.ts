@@ -33,6 +33,7 @@ export class Sales implements OnInit {
   readonly loadingReturnHistory = signal(false);
   readonly submittingReturn = signal(false);
   refundMethod: PaymentMethod = 'Cash';
+  returnReason = '';
 
   ngOnInit(): void {
     this.load();
@@ -69,6 +70,10 @@ export class Sales implements OnInit {
     this.invoice.print(s);
   }
 
+  downloadInvoice(s: SaleDto): void {
+    this.invoice.download(s);
+  }
+
   downloadReport(): void {
     this.downloadingReport.set(true);
     this.api.salesReport(this.from || undefined, this.to || undefined).subscribe({
@@ -95,6 +100,7 @@ export class Sales implements OnInit {
     this.loadingReturnHistory.set(true);
     this.submittingReturn.set(false);
     this.refundMethod = sale.paymentMethod;
+    this.returnReason = '';
     this.api.saleReturns(sale.id).subscribe({
       next: (returns) => {
         this.returnHistory.set(returns);
@@ -128,6 +134,7 @@ export class Sales implements OnInit {
     this.returningSale.set(null);
     this.returnHistory.set([]);
     this.returnQuantities.set({});
+    this.returnReason = '';
     this.loadingReturnHistory.set(false);
     this.submittingReturn.set(false);
   }
@@ -144,7 +151,7 @@ export class Sales implements OnInit {
     }
 
     this.submittingReturn.set(true);
-    this.api.returnSale(sale.id, this.refundMethod, items).subscribe({
+    this.api.returnSale(sale.id, this.refundMethod, items, this.returnReason.trim() || undefined).subscribe({
       next: (result) => {
         this.toast.show(`Return recorded. Refund ${money(result.totalAmount)}.`);
         this.closeReturns();

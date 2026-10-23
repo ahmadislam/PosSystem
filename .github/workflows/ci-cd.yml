@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NG_BUILD_SASS_EMBEDDED: 'false'
+      POS_API_ORIGIN: https://ci-api.example.invalid
     defaults:
       run:
         working-directory: web
@@ -50,4 +51,13 @@ jobs:
             echo "RENDER_DEPLOY_HOOK is not configured; skipping optional Render deployment."
           else
             curl --fail --silent --show-error -X POST "$RENDER_DEPLOY_HOOK"
+          fi
+      - name: Trigger Vercel deploy when configured
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK is not configured; skipping optional Vercel deployment."
+          else
+            curl --fail --silent --show-error -X POST "$VERCEL_DEPLOY_HOOK"
           fi

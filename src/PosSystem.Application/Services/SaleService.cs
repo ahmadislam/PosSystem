@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PosSystem.Application.Common;
 using PosSystem.Application.Dtos;
@@ -9,21 +12,33 @@ namespace PosSystem.Application.Services;
 
 public interface ISaleService
 {
-    Task<SaleDto> CreateAsync(CreateSaleRequest request, CancellationToken ct = default);
+    Task<SaleDto> CreateAsync(CreateSaleRequest request, string idempotencyKey, CancellationToken ct = default);
     Task<SaleDto> GetAsync(int id, CancellationToken ct = default);
     Task<PagedResult<SaleDto>> ListAsync(DateTime? from, DateTime? to, int page, int pageSize, CancellationToken ct = default);
 }
 
-public class SaleService(IAppDbContext db, ICurrentUser current, ILowStockNotifier lowStock) : ISaleService
+public class SaleService(
+    IAppDbContext db,
+    ICurrentUser current,
+    ILowStockNotifier lowStock) : ISaleService
 {
-    public async Task<SaleDto> CreateAsync(CreateSaleRequest request, CancellationToken ct = default)
+    public async Task<SaleDto> CreateAsync(CreateSaleRequest request, string idempotencyKey, CancellationToken ct = default)
     {
         var userId = current.UserId ?? throw new UnauthorizedAppException("Not signed in.");
         if (request.Items.Count == 0) throw new BadRequestException("A sale needs at least one item.");
+        if (!Guid.TryParse(idempotencyKey, out var parsedKey))
+            throw new BadRequestException("A valid Idempotency-Key UUID header is required.");
+        idempotencyKey = parsedKey.ToString("N");
+        var requestHash = HashRequest(request);
 
         var ids = request.Items.Select(i => i.ProductId).Distinct().ToList();
         if (ids.Count != request.Items.Count)
             throw new BadRequestException("Each product may appear once; increase the quantity instead.");
+
+        var previousSale = await db.Sales.AsNoTracking().Include(s => s.Items)
+            .SingleOrDefaultAsync(s => s.CashierId == userId && s.IdempotencyKey == idempotencyKey, ct);
+        if (previousSale is not null)
+            return ReturnIfSameRequest(previousSale, requestHash);
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         try
@@ -34,11 +49,21 @@ public class SaleService(IAppDbContext db, ICurrentUser current, ILowStockNotifi
             if (shiftId == 0) throw new BadRequestException("Open a shift before making sales.");
 
             var shift = await db.CashierShifts.FirstAsync(s => s.Id == shiftId, ct);
+            previousSale = await db.Sales.AsNoTracking().Include(s => s.Items)
+                .SingleOrDefaultAsync(s => s.CashierId == userId && s.IdempotencyKey == idempotencyKey, ct);
+            if (previousSale is not null)
+            {
+                var result = ReturnIfSameRequest(previousSale, requestHash);
+                await tx.CommitAsync(ct);
+                return result;
+            }
+
             var products = await db.Products.Where(p => ids.Contains(p.Id) && p.IsActive).ToDictionaryAsync(p => p.Id, ct);
             var sale = new Sale
             {
                 CashierId = userId, ShiftId = shift.Id, SaleDate = DateTime.UtcNow,
-                PaymentMethod = request.PaymentMethod, Status = SaleStatus.Completed
+                PaymentMethod = request.PaymentMethod, Status = SaleStatus.Completed,
+                IdempotencyKey = idempotencyKey, RequestHash = requestHash
             };
 
             foreach (var line in request.Items)
@@ -62,6 +87,8 @@ public class SaleService(IAppDbContext db, ICurrentUser current, ILowStockNotifi
                 sale.TotalAmount += total;
             }
 
+            await lowStock.CheckAsync(ids, ct);
+
             // Database sequence: unique and race-free even with several cashiers.
             var seq = await db.Database.SqlQuery<int>($"SELECT nextval('invoice_seq')::int AS \"Value\"").SingleAsync(ct);
             sale.InvoiceNumber = $"INV-{sale.SaleDate:yyyyMMdd}-{seq:D6}";
@@ -79,14 +106,30 @@ public class SaleService(IAppDbContext db, ICurrentUser current, ILowStockNotifi
             }
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
-
-            await lowStock.CheckAsync(ids, ct);   // only after the commit succeeded
             return await GetAsync(sale.Id, ct);
         }
         catch (DbUpdateConcurrencyException)
         {
             throw new ConflictException("Stock changed while the sale was processing. Please retry.");
         }
+    }
+
+    private static SaleDto ReturnIfSameRequest(Sale sale, string requestHash)
+    {
+        if (!string.Equals(sale.RequestHash, requestHash, StringComparison.Ordinal))
+            throw new ConflictException("This Idempotency-Key was already used with a different checkout request.");
+        return ToDto(sale);
+    }
+
+    private static string HashRequest(CreateSaleRequest request)
+    {
+        var canonical = JsonSerializer.Serialize(new
+        {
+            request.PaymentMethod,
+            Items = request.Items.OrderBy(item => item.ProductId)
+                .Select(item => new { item.ProductId, item.Quantity, item.DiscountAmount })
+        });
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
     }
 
     public async Task<SaleDto> GetAsync(int id, CancellationToken ct = default)

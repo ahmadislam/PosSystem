@@ -73,6 +73,14 @@
           }
         </select>
       </label>
+      <label>Default supplier
+        <select [(ngModel)]="form.defaultSupplierId" name="defaultSupplierId">
+          <option [ngValue]="null">None</option>
+          @for (supplier of suppliers(); track supplier.id) {
+            <option [ngValue]="supplier.id">{{ supplier.name }}</option>
+          }
+        </select>
+      </label>
       <div class="pair">
         <label>Cost <input type="number" step="0.01" [(ngModel)]="form.costPrice" name="cost" /></label>
         <label>Sale <input type="number" step="0.01" [(ngModel)]="form.salePrice" name="sale" /></label>

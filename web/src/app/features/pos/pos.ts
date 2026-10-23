@@ -23,13 +23,20 @@ export class Pos implements OnInit {
   readonly lineTotals = lineTotals;
 
   search = '';
+  barcode = '';
   categoryId: number | null = null;
   payment: PaymentMethod = 'Cash';
+  cashTendered: number | null = null;
+  private checkoutFingerprint = '';
+  private checkoutKey = '';
+  readonly page = signal(1);
+  readonly totalPages = signal(1);
   readonly categories = signal<CategoryDto[]>([]);
   readonly products = signal<ProductDto[]>([]);
   readonly shift = signal<ShiftDto | null>(null);
   readonly busy = signal(false);
   readonly lastSale = signal<SaleDto | null>(null);
+  readonly lastChangeDue = signal<number | null>(null);
 
   ngOnInit(): void {
     this.api.categories().subscribe({ next: (c) => this.categories.set(c) });
@@ -39,11 +46,48 @@ export class Pos implements OnInit {
 
   loadProducts(): void {
     this.api
-      .products({ search: this.search.trim() || undefined, categoryId: this.categoryId, pageSize: 100 })
+      .products({
+        search: this.search.trim() || undefined,
+        categoryId: this.categoryId,
+        page: this.page(),
+        pageSize: 24,
+      })
       .subscribe({
-        next: (page) => this.products.set(page.items.filter((p) => p.isActive)),
+        next: (page) => {
+          this.products.set(page.items.filter((p) => p.isActive));
+          this.totalPages.set(Math.max(page.totalPages, 1));
+        },
         error: (e) => this.toast.show(apiError(e), 'err'),
       });
+  }
+
+  searchProducts(): void {
+    this.page.set(1);
+    this.loadProducts();
+  }
+
+  movePage(delta: number): void {
+    this.page.update((page) => Math.max(1, Math.min(this.totalPages(), page + delta)));
+    this.loadProducts();
+  }
+
+  scanBarcode(): void {
+    const barcode = this.barcode.trim();
+    if (!barcode) return;
+    this.api.products({ search: barcode, page: 1, pageSize: 20 }).subscribe({
+      next: (result) => {
+        const product = result.items.find((item) => item.sku === barcode);
+        if (!product) {
+          this.toast.show(`No product found for barcode/SKU ${barcode}.`, 'warn');
+          return;
+        }
+        const message = this.cart.add(product);
+        if (message) this.toast.show(message, 'warn');
+        else this.toast.show(`${product.sku} added to cart.`);
+        this.barcode = '';
+      },
+      error: (e) => this.toast.show(apiError(e), 'err'),
+    });
   }
 
   refreshShift(): void {
@@ -69,19 +113,36 @@ export class Pos implements OnInit {
       this.toast.show('Cart is empty.', 'warn');
       return;
     }
+    const total = this.cart.preview().total;
+    const payment = this.payment;
+    const cashTendered = this.cashTendered;
+    if (payment === 'Cash' && (!Number.isFinite(cashTendered) || (cashTendered ?? -1) < total)) {
+      this.toast.show('Cash tendered must be at least the sale total.', 'warn');
+      return;
+    }
+    const payload = {
+      payment: this.payment,
+      items: lines.map((line) => ({
+        productId: line.product.id,
+        quantity: line.quantity,
+        discountAmount: line.discountAmount,
+      })),
+    };
+    const fingerprint = JSON.stringify(payload);
+    if (fingerprint !== this.checkoutFingerprint) {
+      this.checkoutFingerprint = fingerprint;
+      this.checkoutKey = crypto.randomUUID();
+    }
     this.busy.set(true);
     this.api
-      .createSale(
-        this.payment,
-        lines.map((l) => ({
-          productId: l.product.id,
-          quantity: l.quantity,
-          discountAmount: l.discountAmount,
-        })),
-      )
+      .createSale(payment, payload.items, this.checkoutKey)
       .subscribe({
         next: (sale) => {
+          this.checkoutFingerprint = '';
+          this.checkoutKey = '';
+          this.lastChangeDue.set(payment === 'Cash' ? Math.max(0, (cashTendered ?? 0) - total) : null);
           this.cart.clear();
+          this.cashTendered = null;
           this.lastSale.set(sale);
           this.busy.set(false);
           this.toast.show(`Sale ${sale.invoiceNumber} recorded.`);
@@ -97,5 +158,15 @@ export class Pos implements OnInit {
   printReceipt(): void {
     const sale = this.lastSale();
     if (sale) this.invoice.print(sale);
+  }
+
+  downloadInvoice(): void {
+    const sale = this.lastSale();
+    if (sale) this.invoice.download(sale);
+  }
+
+  changeDue(): number {
+    if (this.payment !== 'Cash' || !Number.isFinite(this.cashTendered)) return 0;
+    return Math.max(0, (this.cashTendered ?? 0) - this.cart.preview().total);
   }
 }

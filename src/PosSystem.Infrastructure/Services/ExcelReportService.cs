@@ -110,7 +110,7 @@ public sealed class ExcelReportService(AppDbContext db) : IExcelReportService
         summary.Cell(2, 2).Value = $"{start:yyyy-MM-dd} to {to:yyyy-MM-dd}";
         summary.Cell(3, 1).Value = "Sales count";
         summary.Cell(3, 2).Value = sales.Count;
-        summary.Cell(4, 1).Value = "Sales total";
+        summary.Cell(4, 1).Value = "Gross sales";
         summary.Cell(4, 2).Value = sales.Sum(s => s.TotalAmount);
         summary.Cell(5, 1).Value = "Returns count";
         summary.Cell(5, 2).Value = returns.Count;

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
+using PosSystem.Api.Controllers;
 using Microsoft.EntityFrameworkCore;
 using PosSystem.Api.Persistence;
 using PosSystem.Application.Common;
@@ -19,6 +21,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
+        services.AddScoped<IClaimsTransformation, AuthorizationStateClaimsTransformation>();
+        services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddOptions<EmailOptions>()
@@ -28,12 +32,15 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
         services.AddTransient<IEmailSender, SmtpEmailSender>();
         services.AddTransient<LowStockEmailJob>();
+        services.AddTransient<LowStockAlertDispatcher>();
         services.AddTransient<DailySalesReportJob>();
         services.AddScoped<ILowStockNotifier, HangfireLowStockNotifier>();
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<ISupplierService, SupplierService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
         services.AddScoped<IShiftService, ShiftService>();
         services.AddScoped<ISaleService, SaleService>();
         services.AddScoped<ISaleReturnService, SaleReturnService>();

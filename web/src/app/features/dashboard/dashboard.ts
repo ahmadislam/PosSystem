@@ -20,6 +20,8 @@ export class Dashboard implements OnInit {
   readonly lowStock = signal<DashboardSummaryDto['lowStockProducts']>([]);
   readonly lowStockCount = signal(0);
   readonly revenue = signal(0);
+  readonly refunds = signal(0);
+  readonly netRevenue = signal(0);
   readonly count = signal(0);
   readonly bars = signal<{ label: string; value: number; pct: number }[]>([]);
   readonly monthlyBars = signal<{ label: string; value: number; pct: number }[]>([]);
@@ -36,7 +38,9 @@ export class Dashboard implements OnInit {
       next: (summary) => {
         this.sales.set(summary.recentSales);
         this.count.set(summary.totalSales);
-        this.revenue.set(summary.revenue);
+        this.revenue.set(summary.grossSales);
+        this.refunds.set(summary.refunds);
+        this.netRevenue.set(summary.netRevenue);
         this.lowStockCount.set(summary.lowStockCount);
         this.lowStock.set(summary.lowStockProducts);
         this.bars.set(buildDailyBars(summary.dailySales, weekStart, 7));

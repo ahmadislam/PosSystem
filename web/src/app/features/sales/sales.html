@@ -34,7 +34,8 @@
           <td>{{ s.status }}</td>
           <td class="n">{{ money(s.totalAmount) }}</td>
           <td class="actions">
-            <button type="button" class="tiny" (click)="print(s)">Receipt</button>
+            <button type="button" class="tiny" (click)="print(s)">Print invoice</button>
+            <button type="button" class="tiny" (click)="downloadInvoice(s)">Download PDF</button>
             <button type="button" class="tiny" (click)="openReturns(s)">{{ s.status === 'Refunded' ? 'Returns' : 'Return' }}</button>
           </td>
         </tr>
@@ -69,6 +70,10 @@
           <option value="Online">Online</option>
         </select>
       </label>
+      <label>
+        Return reason (optional)
+        <textarea [(ngModel)]="returnReason" maxlength="500" rows="2"></textarea>
+      </label>
       <p class="muted">Refund totals are calculated from the original sale prices, discount, and tax.</p>
 
       <div class="return-lines">
@@ -94,7 +99,10 @@
         <section class="return-history">
           <h3>Previous returns</h3>
           @for (entry of returnHistory(); track entry.id) {
-            <p>{{ entry.refundDate | date:'short' }} · {{ entry.refundMethod }} · {{ money(entry.totalAmount) }}</p>
+            <p>
+              {{ entry.refundDate | date:'short' }} · {{ entry.refundMethod }} · {{ money(entry.totalAmount) }}
+              @if (entry.reason) { <span> · {{ entry.reason }}</span> }
+            </p>
           }
         </section>
       }

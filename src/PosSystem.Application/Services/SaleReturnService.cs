@@ -14,7 +14,7 @@ public interface ISaleReturnService
     Task<IReadOnlyList<SaleReturnDto>> ListAsync(int saleId, CancellationToken ct = default);
 }
 
-public class SaleReturnService(IAppDbContext db, ICurrentUser current) : ISaleReturnService
+public class SaleReturnService(IAppDbContext db, ICurrentUser current, ILowStockNotifier lowStock) : ISaleReturnService
 {
     public async Task<SaleReturnDto> CreateAsync(int saleId, CreateSaleReturnRequest request, CancellationToken ct = default)
     {
@@ -72,7 +72,8 @@ public class SaleReturnService(IAppDbContext db, ICurrentUser current) : ISaleRe
             ShiftId = shift.Id,
             ProcessedByUserId = userId,
             RefundDate = DateTime.UtcNow,
-            RefundMethod = request.RefundMethod
+            RefundMethod = request.RefundMethod,
+            Reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim()
         };
 
         foreach (var requested in request.Items)
@@ -128,6 +129,7 @@ public class SaleReturnService(IAppDbContext db, ICurrentUser current) : ISaleRe
             ? SaleStatus.Refunded
             : SaleStatus.PartiallyReturned;
 
+        await lowStock.CheckAsync(productIds, ct);
         db.SaleReturns.Add(saleReturn);
         await db.SaveChangesAsync(ct);
 
@@ -179,6 +181,7 @@ public class SaleReturnService(IAppDbContext db, ICurrentUser current) : ISaleRe
         saleReturn.ProcessedByUserId,
         saleReturn.RefundDate,
         saleReturn.RefundMethod,
+        saleReturn.Reason,
         saleReturn.Subtotal,
         saleReturn.DiscountAmount,
         saleReturn.TaxAmount,

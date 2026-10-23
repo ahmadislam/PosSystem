@@ -1,28 +1,40 @@
-using Hangfire;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using PosSystem.Application.Common;
+using PosSystem.Domain.Entities;
 
 namespace PosSystem.Infrastructure.Services;
 
-public class HangfireLowStockNotifier(
-    IAppDbContext db,
-    IBackgroundJobClient jobs,
-    IOptions<EmailOptions> options) : ILowStockNotifier
+public class HangfireLowStockNotifier(IAppDbContext db) : ILowStockNotifier
 {
     public async Task CheckAsync(IEnumerable<int> productIds, CancellationToken ct = default)
     {
-        if (!options.Value.Enabled) return;
-
         var ids = productIds.Distinct().ToArray();
         if (ids.Length == 0) return;
 
-        var lowStockIds = await db.Products.AsNoTracking()
-            .Where(p => ids.Contains(p.Id) && p.StockQuantity <= p.MinStockThreshold)
-            .Select(p => p.Id)
+        var products = await db.Products.IgnoreQueryFilters()
+            .Where(p => ids.Contains(p.Id))
             .ToArrayAsync(ct);
-        if (lowStockIds.Length == 0) return;
-
-        jobs.Enqueue<LowStockEmailJob>(job => job.SendAsync(lowStockIds, CancellationToken.None));
+        var alerts = await db.LowStockAlerts
+            .Where(alert => ids.Contains(alert.ProductId) && alert.ResolvedAt == null)
+            .ToDictionaryAsync(alert => alert.ProductId, ct);
+        var now = DateTime.UtcNow;
+        foreach (var product in products)
+        {
+            if (product.StockQuantity <= product.MinStockThreshold)
+            {
+                if (!alerts.ContainsKey(product.Id))
+                    db.LowStockAlerts.Add(new LowStockAlert
+                    {
+                        ProductId = product.Id,
+                        DetectedAt = now,
+                        NextAttemptAt = now
+                    });
+            }
+            else if (alerts.TryGetValue(product.Id, out var active))
+            {
+                active.ResolvedAt = now;
+                active.LastError = null;
+            }
+        }
     }
 }
