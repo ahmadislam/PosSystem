@@ -78,8 +78,12 @@
           <div class="line-top"><strong>{{ line.product.name }}</strong><button type="button" class="remove" (click)="cart.remove(line.product.id)" [attr.aria-label]="'Remove ' + line.product.name">×</button></div>
           <div class="line-meta"><span>{{ money(line.product.salePrice) }} each</span><strong>{{ money(lineTotals(line.product.salePrice, line.quantity, line.discountAmount, line.product.taxRate).total) }}</strong></div>
           <div class="line-controls">
-            <label>Qty <input type="number" min="1" [max]="line.product.stockQuantity" [ngModel]="line.quantity"
-                     (ngModelChange)="cart.setQuantity(line.product.id, $event)" /></label>
+            <div class="quantity-control" role="group" [attr.aria-label]="'Quantity for ' + line.product.name">
+              <button type="button" (click)="decrementLine(line.product.id, line.quantity)" [attr.aria-label]="'Decrease quantity of ' + line.product.name">−</button>
+              <input type="number" min="1" [max]="line.product.stockQuantity" [ngModel]="line.quantity"
+                     (ngModelChange)="cart.setQuantity(line.product.id, $event)" [attr.aria-label]="'Quantity for ' + line.product.name" />
+              <button type="button" (click)="incrementLine(line.product.id, line.quantity)" [disabled]="line.quantity >= line.product.stockQuantity" [attr.aria-label]="'Increase quantity of ' + line.product.name">+</button>
+            </div>
             <label>Discount <input type="number" min="0" step="0.01" [ngModel]="line.discountAmount"
                      (ngModelChange)="cart.setDiscount(line.product.id, $event)" /></label>
           </div>
@@ -103,12 +107,12 @@
           @for (customer of customers(); track customer.id) { <option [ngValue]="customer.id">{{ customer.name }} · {{ customer.loyaltyPoints }} pts</option> }
         </select>
       </label>
-      <div class="field-pair">
-        <label class="pay">Coupon code <input [(ngModel)]="couponCode" maxlength="40" autocomplete="off" placeholder="Optional" /></label>
-        <label class="pay">Payment method
-          <select [(ngModel)]="payment"><option value="Cash">Cash</option><option value="Card">Card</option><option value="Online">Online</option></select>
-        </label>
-      </div>
+      <label class="pay">Coupon code <input [(ngModel)]="couponCode" maxlength="40" autocomplete="off" placeholder="Optional" /></label>
+      <fieldset class="payment-selector"><legend>Payment method</legend><div role="radiogroup" class="payment-options">
+        @for (method of paymentMethods; track method) {
+          <button type="button" [class.active]="payment === method" [attr.aria-pressed]="payment === method" (click)="selectPayment(method)">{{ method }}</button>
+        }
+      </div></fieldset>
       @if (customerId) {
         <label class="pay">Redeem loyalty points
           <input type="number" min="0" [max]="customers().find(c => c.id === customerId)?.loyaltyPoints ?? 0"
@@ -125,6 +129,7 @@
       }
       @if (payment === 'Cash') {
         <div class="cash-row"><label class="pay">Cash tendered <input type="number" min="0" step="0.01" [(ngModel)]="cashTendered" /></label><div class="change-due"><span>Change due</span><strong>{{ money(changeDue()) }}</strong></div></div>
+        <div class="quick-cash" aria-label="Quick cash amounts"><button type="button" (click)="addCashTender(5)">{{ money(5) }}</button><button type="button" (click)="addCashTender(10)">{{ money(10) }}</button><button type="button" (click)="addCashTender(20)">{{ money(20) }}</button><button type="button" (click)="addCashTender(50)">{{ money(50) }}</button><button type="button" class="exact" (click)="setExactTender()">Exact</button><button type="button" class="clear" (click)="clearTender()">Clear</button></div>
       }
     </div>
 
@@ -135,7 +140,7 @@
 @if (lastSale(); as sale) {
   <div class="modal" (click)="lastSale.set(null)">
     <div class="card" (click)="$event.stopPropagation()">
-      <p class="eyebrow">Payment recorded</p><h2>Sale complete</h2><p>{{ sale.invoiceNumber }} · {{ money(sale.totalAmount) }}</p>
+      <div class="success-check" aria-hidden="true">✓</div><p class="eyebrow">Payment recorded</p><h2>Sale complete</h2><p>{{ sale.invoiceNumber }} · {{ money(sale.totalAmount) }}</p>
       @if (lastChangeDue() !== null) { <p>Change due: {{ money(lastChangeDue() ?? 0) }}</p> }
       <div class="actions"><button type="button" (click)="printReceipt()">Print / PDF</button><button type="button" class="ghost" (click)="downloadInvoice()">Download invoice PDF</button><button type="button" class="ghost" (click)="lastSale.set(null)">Close</button></div>
     </div>

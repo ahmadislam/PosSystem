@@ -47,6 +47,7 @@ export class Pos implements OnInit {
   readonly lastSale = signal<SaleDto | null>(null);
   readonly lastChangeDue = signal<number | null>(null);
   readonly lastAddedId = signal<number | null>(null);
+  readonly paymentMethods: readonly PaymentMethod[] = ['Cash', 'Card', 'Online'];
   @ViewChild('productSearch') private productSearch?: ElementRef<HTMLInputElement>;
 
   ngOnInit(): void {
@@ -147,6 +148,34 @@ export class Pos implements OnInit {
     const msg = this.cart.add(p);
     if (msg) this.toast.show(msg, 'warn');
     else this.confirmAdded(p);
+  }
+
+  selectPayment(method: PaymentMethod): void {
+    this.payment = method;
+    if (method === 'Cash') {
+      this.paymentProvider = '';
+      this.paymentReference = '';
+    }
+  }
+
+  addCashTender(amount: number): void {
+    this.cashTendered = this.roundMoney((this.cashTendered ?? 0) + amount);
+  }
+
+  setExactTender(): void {
+    this.cashTendered = this.promotionPreview().total;
+  }
+
+  clearTender(): void {
+    this.cashTendered = null;
+  }
+
+  decrementLine(productId: number, quantity: number): void {
+    this.cart.setQuantity(productId, quantity - 1);
+  }
+
+  incrementLine(productId: number, quantity: number): void {
+    this.cart.setQuantity(productId, quantity + 1);
   }
 
   checkout(): void {
