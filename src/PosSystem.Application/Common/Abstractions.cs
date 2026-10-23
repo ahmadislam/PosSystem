@@ -26,6 +26,7 @@ public interface IAppDbContext
     DbSet<LoyaltyTransaction> LoyaltyTransactions { get; }
     DbSet<Coupon> Coupons { get; }
     DbSet<ProductImage> ProductImages { get; }
+    DbSet<ProductImageContent> ProductImageContents { get; }
     DatabaseFacade Database { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

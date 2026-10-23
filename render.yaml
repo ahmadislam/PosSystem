@@ -1,0 +1,29 @@
+# Free demo: one service hosts Angular + API. Create a free Neon database first.
+# Render prompts for the database connection; generated secrets stay in its settings.
+services:
+  - type: web
+    name: possystem-demo
+    runtime: docker
+    plan: free
+    branch: feature/release-readiness
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__Default
+        sync: false
+      - key: Jwt__Key
+        generateValue: true
+      - key: Seed__AdminPassword
+        generateValue: true
+      - key: Seed__AdminUsername
+        value: admin
+      - key: Seed__AdminEmail
+        value: admin@example.com
+      - key: Email__Enabled
+        value: "false"
+      - key: Hangfire__WorkerCount
+        value: "2"
+      - key: ProductImages__Storage
+        value: Database

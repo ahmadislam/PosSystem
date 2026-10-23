@@ -128,8 +128,52 @@ jobs:
         env:
           PG_DOCKER_CONTAINER: ${{ job.services.postgres.id }}
 
+  container:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pos_container
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pos_container"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t possystem-demo:test .
+      - name: Start combined container against disposable database
+        run: >-
+          docker run --detach --name pos-demo --network host
+          --env ASPNETCORE_ENVIRONMENT=Development
+          --env 'ConnectionStrings__Default=Host=127.0.0.1;Port=5432;Database=pos_container;Username=postgres;Password=postgres'
+          --env ProductImages__Storage=Database
+          possystem-demo:test
+      - name: Check combined UI and API readiness
+        shell: python
+        run: |
+          import time, urllib.request, urllib.error
+          for attempt in range(90):
+              try:
+                  if urllib.request.urlopen('http://127.0.0.1:10000/health', timeout=3).read() == b'Healthy':
+                      break
+              except (OSError, urllib.error.URLError):
+                  pass
+              time.sleep(1)
+          else:
+              raise SystemExit('Container readiness failed')
+          html = urllib.request.urlopen('http://127.0.0.1:10000/pos').read()
+          assert b'<app-root' in html
+          config = urllib.request.urlopen('http://127.0.0.1:10000/runtime-config.js').read()
+          assert b'window.location.origin' in config
+      - run: docker logs pos-demo
+        if: failure()
+      - run: docker rm --force pos-demo
+        if: always()
+
   deploy:
-    needs: [api, web, integration, e2e, backup-restore]
+    needs: [api, web, integration, e2e, backup-restore, container]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:

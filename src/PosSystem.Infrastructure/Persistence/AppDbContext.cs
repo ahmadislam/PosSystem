@@ -32,6 +32,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<LoyaltyTransaction> LoyaltyTransactions => Set<LoyaltyTransaction>();
     public DbSet<Coupon> Coupons => Set<Coupon>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductImageContent> ProductImageContents => Set<ProductImageContent>();
 
     // Properties never written into the audit trail.
     private static readonly HashSet<string> AuditIgnored = ["PasswordHash", "RowVersion", "UpdatedAt", "CreatedAt"];
@@ -191,6 +192,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             e.Property(c => c.Name).HasMaxLength(200);
             e.HasIndex(c => c.Code).IsUnique();
         });
+        b.Entity<ProductImageContent>(e =>
+        {
+            e.HasKey(content => content.ProductImageId);
+            e.HasOne<ProductImage>().WithOne().HasForeignKey<ProductImageContent>(content => content.ProductImageId);
+        });
+
         b.Entity<ProductImage>(e =>
         {
             e.Property(i => i.StorageKey).HasMaxLength(100);

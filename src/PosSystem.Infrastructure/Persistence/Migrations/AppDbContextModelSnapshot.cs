@@ -480,6 +480,20 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("ProductImages");
                 });
 
+            modelBuilder.Entity("PosSystem.Domain.Entities.ProductImageContent", b =>
+                {
+                    b.Property<int>("ProductImageId")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.HasKey("ProductImageId");
+
+                    b.ToTable("ProductImageContents");
+                });
+
             modelBuilder.Entity("PosSystem.Domain.Entities.PurchaseOrder", b =>
                 {
                     b.Property<int>("Id")
@@ -1137,6 +1151,15 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("PosSystem.Domain.Entities.ProductImageContent", b =>
+                {
+                    b.HasOne("PosSystem.Domain.Entities.ProductImage", null)
+                        .WithOne()
+                        .HasForeignKey("PosSystem.Domain.Entities.ProductImageContent", "ProductImageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("PosSystem.Domain.Entities.PurchaseOrder", b =>

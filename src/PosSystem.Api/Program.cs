@@ -12,6 +12,7 @@ using PosSystem.Application.Common;
 using PosSystem.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var serveClient = ClientHosting.Configure(builder);
 var forwardedHeaders = TrustedProxyConfiguration.Create(builder.Configuration.GetSection("ReverseProxy"));
 
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
@@ -43,7 +44,8 @@ builder.Services.AddHangfire(configuration => configuration
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
     .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(connectionString)));
-builder.Services.AddHangfireServer();
+builder.Services.AddHangfireServer(options => options.WorkerCount =
+    Math.Clamp(builder.Configuration.GetValue("Hangfire:WorkerCount", 2), 1, 20));
 
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -95,10 +97,15 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSwagger();       // public on purpose: the live Swagger link goes on your CV
 app.UseSwaggerUI();
 app.UseCors("web");
+if (serveClient)
+{
+    ClientHosting.UseClientFiles(app);
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
+if (serveClient) ClientHosting.MapClientFallback(app);
 
 await DbSeeder.SeedAsync(app.Services, app.Configuration);
 var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();

@@ -11,6 +11,7 @@ public sealed class ProductImageStorage(
     IWebHostEnvironment environment)
 {
     private const long MaxBytes = 4 * 1024 * 1024;
+    private readonly bool _database = string.Equals(configuration["ProductImages:Storage"], "Database", StringComparison.OrdinalIgnoreCase);
     private readonly string _directory = Path.GetFullPath(configuration["ProductImages:Directory"]
         ?? Path.Combine(environment.ContentRootPath, "App_Data", "product-images"));
 
@@ -27,25 +28,30 @@ public sealed class ProductImageStorage(
         var bytes = memory.ToArray();
         var (contentType, extension) = Identify(bytes);
         var key = $"{Guid.NewGuid():N}{extension}";
-        Directory.CreateDirectory(_directory);
+        if (!_database) Directory.CreateDirectory(_directory);
         var path = Resolve(key);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         try
         {
-            await File.WriteAllBytesAsync(path, bytes, ct);
+            if (!_database) await File.WriteAllBytesAsync(path, bytes, ct);
             var existing = await db.ProductImages.Where(image => image.ProductId == productId).ToListAsync(ct);
             foreach (var image in existing) image.IsPrimary = false;
             if (existing.Count > 0) await db.SaveChangesAsync(ct);
             var saved = new ProductImage { ProductId = productId, StorageKey = key, ContentType = contentType, IsPrimary = true };
             db.ProductImages.Add(saved);
             await db.SaveChangesAsync(ct);
+            if (_database)
+            {
+                db.ProductImageContents.Add(new ProductImageContent { ProductImageId = saved.Id, Bytes = bytes });
+                await db.SaveChangesAsync(ct);
+            }
             await transaction.CommitAsync(ct);
             return saved;
         }
         catch
         {
             await transaction.RollbackAsync(ct);
-            if (File.Exists(path)) File.Delete(path);
+            if (!_database && File.Exists(path)) File.Delete(path);
             throw;
         }
     }
@@ -81,14 +87,17 @@ public sealed class ProductImageStorage(
         await transaction.CommitAsync(ct);
     }
 
-    public async Task<(ProductImage Image, string Path)> GetAsync(int productId, int imageId, CancellationToken ct)
+    public async Task<(ProductImage Image, string? Path, byte[]? Bytes)> GetAsync(int productId, int imageId, CancellationToken ct)
     {
         var image = await db.ProductImages.AsNoTracking()
             .FirstOrDefaultAsync(image => image.ProductId == productId && image.Id == imageId, ct)
             ?? throw new PosSystem.Application.Common.NotFoundException("Product image not found.");
+        var content = await db.ProductImageContents.AsNoTracking()
+            .FirstOrDefaultAsync(content => content.ProductImageId == imageId, ct);
+        if (content is not null) return (image, null, content.Bytes);
         var path = Resolve(image.StorageKey);
         if (!File.Exists(path)) throw new InvalidOperationException("The stored product image file is missing.");
-        return (image, path);
+        return (image, path, null);
     }
 
     public async Task DeleteAsync(int productId, int imageId, CancellationToken ct)
@@ -98,6 +107,8 @@ public sealed class ProductImageStorage(
             ?? throw new PosSystem.Application.Common.NotFoundException("Product image not found.");
         var path = Resolve(image.StorageKey);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var content = await db.ProductImageContents.FindAsync([imageId], ct);
+        if (content is not null) db.ProductImageContents.Remove(content);
         var wasPrimary = image.IsPrimary;
         if (wasPrimary)
         {

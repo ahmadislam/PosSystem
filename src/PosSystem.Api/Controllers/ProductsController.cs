@@ -65,8 +65,10 @@ public class ProductsController(IProductService products, ProductImageStorage im
     [HttpGet("{id:int}/images/{imageId:int}"), AllowAnonymous]
     public async Task<IActionResult> GetImage(int id, int imageId, CancellationToken ct)
     {
-        var (image, path) = await images.GetAsync(id, imageId, ct);
-        return PhysicalFile(path, image.ContentType, enableRangeProcessing: true);
+        var (image, path, bytes) = await images.GetAsync(id, imageId, ct);
+        return bytes is not null
+            ? File(bytes, image.ContentType, enableRangeProcessing: true)
+            : PhysicalFile(path!, image.ContentType, enableRangeProcessing: true);
     }
 
     [HttpDelete("{id:int}/images/{imageId:int}"), Authorize(Roles = "Admin,Manager")]

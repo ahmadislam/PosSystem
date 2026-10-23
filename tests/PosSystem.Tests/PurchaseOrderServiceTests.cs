@@ -282,6 +282,7 @@ public sealed class PurchaseOrderServiceTests
             Assert.Contains(imageList, entry => entry.Id == image.Id && entry.ImageUrl.EndsWith($"/{image.Id}"));
             Assert.False((await storage.GetAsync(productId, image.Id, default)).Image.IsPrimary);
             Assert.True(additional.IsPrimary);
+            Assert.NotNull(stored.Path);
             Assert.Equal(png, await File.ReadAllBytesAsync(stored.Path));
 
             await storage.SetPrimaryAsync(productId, image.Id, default);
@@ -375,7 +376,8 @@ public sealed class PurchaseOrderServiceTests
                 """CREATE TABLE "Customers" ("Id" INTEGER PRIMARY KEY AUTOINCREMENT, "Name" TEXT NOT NULL, "Email" TEXT NULL, "Phone" TEXT NULL, "Address" TEXT NULL, "LoyaltyPoints" INTEGER NOT NULL, "RowVersion" INTEGER NOT NULL DEFAULT 0, "IsActive" INTEGER NOT NULL, "IsDeleted" INTEGER NOT NULL, "CreatedAt" TEXT NOT NULL, "UpdatedAt" TEXT NULL)""",
                 """CREATE TABLE "LoyaltyTransactions" ("Id" INTEGER PRIMARY KEY AUTOINCREMENT, "CustomerId" INTEGER NOT NULL, "SaleId" INTEGER NULL, "SaleReturnId" INTEGER NULL, "PointsChange" INTEGER NOT NULL, "BalanceAfter" INTEGER NOT NULL, "Type" TEXT NOT NULL, "Note" TEXT NULL, "CreatedAt" TEXT NOT NULL, "UpdatedAt" TEXT NULL)""",
                 """CREATE TABLE "Coupons" ("Id" INTEGER PRIMARY KEY AUTOINCREMENT, "Code" TEXT NOT NULL, "Name" TEXT NOT NULL, "IsPercentage" INTEGER NOT NULL, "Value" NUMERIC NOT NULL, "StartsAt" TEXT NOT NULL, "EndsAt" TEXT NOT NULL, "IsActive" INTEGER NOT NULL, "MaxRedemptions" INTEGER NULL, "RedemptionCount" INTEGER NOT NULL, "CreatedAt" TEXT NOT NULL, "UpdatedAt" TEXT NULL)""",
-                """CREATE TABLE "ProductImages" ("Id" INTEGER PRIMARY KEY AUTOINCREMENT, "ProductId" INTEGER NOT NULL, "StorageKey" TEXT NOT NULL, "ContentType" TEXT NOT NULL, "IsPrimary" INTEGER NOT NULL, "CreatedAt" TEXT NOT NULL, "UpdatedAt" TEXT NULL)"""
+                """CREATE TABLE "ProductImages" ("Id" INTEGER PRIMARY KEY AUTOINCREMENT, "ProductId" INTEGER NOT NULL, "StorageKey" TEXT NOT NULL, "ContentType" TEXT NOT NULL, "IsPrimary" INTEGER NOT NULL, "CreatedAt" TEXT NOT NULL, "UpdatedAt" TEXT NULL)""",
+                """CREATE TABLE "ProductImageContents" ("ProductImageId" INTEGER PRIMARY KEY, "Bytes" BLOB NOT NULL)"""
             ];
             foreach (var statement in statements)
                 await db.Database.ExecuteSqlRawAsync(statement);

@@ -9,7 +9,10 @@ export function verifyProductionBuild(outputDirectory, origin) {
     throw new Error('Production runtime configuration must load before the application module.');
   }
   const runtimeConfig = readFileSync(new URL('runtime-config.js', outputDirectory), 'utf8');
-  if (runtimeConfig !== `window.POS_RUNTIME_CONFIG = Object.freeze(${JSON.stringify({ apiOrigin: origin })});\n`) {
+  const expected = origin === 'same-origin'
+    ? 'window.POS_RUNTIME_CONFIG = Object.freeze({apiOrigin:window.location.origin});\n'
+    : `window.POS_RUNTIME_CONFIG = Object.freeze(${JSON.stringify({ apiOrigin: origin })});\n`;
+  if (runtimeConfig !== expected) {
     throw new Error('Built runtime configuration does not match POS_API_ORIGIN.');
   }
   const usesRuntimeConfig = readdirSync(outputDirectory)

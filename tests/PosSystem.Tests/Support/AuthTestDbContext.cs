@@ -27,9 +27,11 @@ internal sealed class AuthTestDbContext(DbContextOptions<AuthTestDbContext> opti
     public DbSet<LoyaltyTransaction> LoyaltyTransactions => throw new NotSupportedException();
     public DbSet<Coupon> Coupons => throw new NotSupportedException();
     public DbSet<ProductImage> ProductImages => throw new NotSupportedException();
+    public DbSet<ProductImageContent> ProductImageContents => throw new NotSupportedException();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ProductImageContent>().HasKey(content => content.ProductImageId);
         modelBuilder.Entity<User>().HasKey(user => user.Id);
         modelBuilder.Entity<RefreshToken>().HasKey(token => token.Id);
         modelBuilder.Entity<RefreshToken>().HasIndex(token => token.TokenHash).IsUnique();

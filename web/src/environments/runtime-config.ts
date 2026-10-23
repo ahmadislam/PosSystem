@@ -10,7 +10,11 @@ export function productionApiOrigin(value: unknown): string {
   } catch {
     throw new Error('POS_RUNTIME_CONFIG.apiOrigin must be an HTTPS origin.');
   }
-  if (parsed.protocol !== 'https:' || parsed.origin !== value.replace(/\/$/, '')) {
+  // A combined container can be exercised locally over HTTP. Public deployments
+  // and all cross-origin APIs still require HTTPS.
+  const localSameOrigin = parsed.protocol === 'http:' && parsed.origin === window.location.origin
+    && ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+  if ((!localSameOrigin && parsed.protocol !== 'https:') || parsed.origin !== value.replace(/\/$/, '')) {
     throw new Error('POS_RUNTIME_CONFIG.apiOrigin must be an HTTPS origin without credentials, path, query, or fragment.');
   }
   return parsed.origin;

@@ -60,6 +60,10 @@ network documentation for peer ranges rather than trusting arbitrary X-Forwarded
 
 ## Run locally
 
+For a free portfolio deployment using one Render service and Neon PostgreSQL, follow
+[the free demo guide](docs/free-demo.md). The included `render.yaml` serves both the client
+and API and stores demo product images in PostgreSQL so no paid persistent disk is needed.
+
 When upgrading, deploy the API and frontend together: cash sale requests now require a
 cent-precision `cashTendered` amount covering the server's current total, and responses include
 the persisted `cashTendered` and `changeDue`. The `AddCashTenderAndChange` migration runs at
