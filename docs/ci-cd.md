@@ -35,3 +35,47 @@ The existing public service address is [possystem-1-26mq.onrender.com](https://p
 - [OpenAPI document](https://possystem-1-26mq.onrender.com/swagger/v1/swagger.json)
 
 During the 2026-10-23 repository audit, this execution environment's network proxy rejected access to the public host with `403 Forbidden`. These links therefore identify the existing target; they are **not an independent verification of its current health or deployed commit**. The database, SMTP secrets, and hosting dashboard credentials were not accessed or changed.
+
+## Read-only Render diagnostics
+
+The [Render diagnostics workflow](../.github/workflows/render-diagnostics.yml) uses the GitHub
+Actions repository secret `RENDER_API_KEY`. Create a temporary Render account API key and save
+it under that name in **GitHub repository → Settings → Secrets and variables → Actions**.
+The key is used inside the Actions runner and is never returned to chat or written to artifacts.
+Revoke it when diagnostics are finished.
+
+The workflow finds the service whose public URL exactly matches
+`https://possystem-1-26mq.onrender.com`. No service ID is normally needed. Optional repository
+variables are `RENDER_SERVICE_ID` and `RENDER_PUBLIC_URL`; the latter must be an HTTPS
+`onrender.com` origin, and both must refer to the same service.
+
+On the release branch, changes to the diagnostics script/workflow trigger a run automatically.
+Open [Render diagnostics runs](https://github.com/ahmadislam/PosSystem/actions?query=workflow%3A%22Render%20diagnostics%22)
+and inspect the job summary or download the `render-diagnostics` artifact. Later checks can use
+**Re-run all jobs**. `workflow_dispatch` is also declared, but GitHub displays its manual run
+button only when that workflow exists on the default branch.
+
+The report includes the latest deployment status/commit, whether that commit matches the checked
+revision, and public health, Angular login and OpenAPI checks. It also counts recognized error
+categories from up to 100 recent log entries in a two-hour window when Render grants log access.
+Raw logs, SQL statements, customer addresses, environment variables, connection strings and API
+error bodies are never exported. Missing log permission is reported separately; an empty sample
+does not establish that older errors never occurred. A deployment can still be building when
+these checks run, so a revision mismatch should be compared with Render Events.
+
+This workflow does not deploy, restart, suspend, change configuration, or modify application data.
+It requires only read permissions from GitHub. Render account API keys may have broader account
+capabilities; the script uses only GET requests and refuses credential-bearing redirects.
+
+Run the safeguards locally without any credentials or network access:
+
+```bash
+python3 -m unittest discover -s tests/render-diagnostics -v
+```
+
+A secret stored in GitHub does not automatically become an agent-environment credential. To
+read GitHub Actions results from an agent, its network policy must permit `api.github.com` and
+its GitHub authentication must authorize the repository API. Render API access additionally
+requires `api.render.com` and a separately configured secure environment binding if direct
+access is desired. Public verification requires the application's hostname. Environment draft
+changes must be reviewed/saved/published before treating that access as active.
