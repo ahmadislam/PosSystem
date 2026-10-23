@@ -45,13 +45,21 @@ public class ShiftService(IAppDbContext db, ICurrentUser current) : IShiftServic
 
     public async Task<ShiftDto> BeginCloseAsync(CancellationToken ct = default)
     {
-        var shift = await GetActiveAsync(ct);
+        var userId = RequireUser();
+        var shiftId = await db.Database
+            .SqlQuery<int>($"SELECT \"Id\" AS \"Value\" FROM \"CashierShifts\" WHERE \"CashierId\" = {userId} AND \"Status\" <> {(int)ShiftStatus.Closed} FOR UPDATE")
+            .SingleOrDefaultAsync(ct);
+        if (shiftId == 0) throw new NotFoundException("No active shift.");
+        var shift = await db.CashierShifts.FirstAsync(s => s.Id == shiftId, ct);
         if (shift.Status != ShiftStatus.Open) throw new BadRequestException("Shift is not open.");
 
         var cashSales = await db.Sales
-            .Where(s => s.ShiftId == shift.Id && s.PaymentMethod == PaymentMethod.Cash && s.Status != SaleStatus.Refunded)
+            .Where(s => s.ShiftId == shift.Id && s.PaymentMethod == PaymentMethod.Cash)
             .SumAsync(s => s.TotalAmount, ct);
-        shift.ExpectedCash = shift.OpeningCash + cashSales;   // refunds are subtracted here in phase 2
+        var cashRefunds = await db.SaleReturns
+            .Where(r => r.ShiftId == shift.Id && r.RefundMethod == PaymentMethod.Cash)
+            .SumAsync(r => r.TotalAmount, ct);
+        shift.ExpectedCash = shift.OpeningCash + cashSales - cashRefunds;
         shift.Status = ShiftStatus.PendingClose;
         await db.SaveChangesAsync(ct);
         return ToDto(shift);

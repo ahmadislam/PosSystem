@@ -4,13 +4,20 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   CategoryDto,
+  AuditAction,
+  AuditLogDto,
   DashboardSummaryDto,
+  EmailSettingsDto,
   PagedResult,
   PaymentMethod,
   ProductDto,
   ProductRequest,
   SaleDto,
+  SaleReturnDto,
   ShiftDto,
+  StaffDto,
+  StockMovementDto,
+  UserRole,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -87,6 +94,21 @@ export class PosApi {
     return this.http.get<SaleDto>(`${this.root}/api/sales/${id}`);
   }
 
+  saleReturns(saleId: number): Observable<SaleReturnDto[]> {
+    return this.http.get<SaleReturnDto[]>(`${this.root}/api/sales/${saleId}/returns`);
+  }
+
+  returnSale(
+    saleId: number,
+    refundMethod: PaymentMethod,
+    items: { saleItemId: number; quantity: number }[],
+  ): Observable<SaleReturnDto> {
+    return this.http.post<SaleReturnDto>(`${this.root}/api/sales/${saleId}/returns`, {
+      refundMethod,
+      items,
+    });
+  }
+
   listSales(from?: string, to?: string, page = 1, pageSize = 20): Observable<PagedResult<SaleDto>> {
     let params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
     if (from) params = params.set('from', from);
@@ -97,5 +119,72 @@ export class PosApi {
   dashboardSummary(from: string, to: string): Observable<DashboardSummaryDto> {
     const params = new HttpParams().set('from', from).set('to', to);
     return this.http.get<DashboardSummaryDto>(`${this.root}/api/dashboard`, { params });
+  }
+
+  auditHistory(opts: {
+    from?: string;
+    to?: string;
+    entityName?: string;
+    action?: AuditAction | '';
+    page?: number;
+  }): Observable<PagedResult<AuditLogDto>> {
+    let params = new HttpParams().set('page', String(opts.page ?? 1)).set('pageSize', '50');
+    if (opts.from) params = params.set('from', opts.from);
+    if (opts.to) params = params.set('to', opts.to);
+    if (opts.entityName) params = params.set('entityName', opts.entityName.trim());
+    if (opts.action) params = params.set('action', opts.action);
+    return this.http.get<PagedResult<AuditLogDto>>(`${this.root}/api/history/audit`, { params });
+  }
+
+  stockMovementHistory(opts: {
+    productId?: number | null;
+    from?: string;
+    to?: string;
+    page?: number;
+  }): Observable<PagedResult<StockMovementDto>> {
+    let params = new HttpParams().set('page', String(opts.page ?? 1)).set('pageSize', '50');
+    if (opts.productId) params = params.set('productId', String(opts.productId));
+    if (opts.from) params = params.set('from', opts.from);
+    if (opts.to) params = params.set('to', opts.to);
+    return this.http.get<PagedResult<StockMovementDto>>(`${this.root}/api/history/stock-movements`, { params });
+  }
+
+  salesReport(from?: string, to?: string): Observable<Blob> {
+    let params = new HttpParams();
+    if (from) params = params.set('from', from);
+    if (to) params = params.set('to', to);
+    return this.http.get(`${this.root}/api/reports/sales.xlsx`, { params, responseType: 'blob' });
+  }
+
+  inventoryReport(): Observable<Blob> {
+    return this.http.get(`${this.root}/api/reports/inventory.xlsx`, { responseType: 'blob' });
+  }
+
+  staff(): Observable<StaffDto[]> {
+    return this.http.get<StaffDto[]>(`${this.root}/api/staff`);
+  }
+
+  createStaff(body: { username: string; email: string; password: string; role: UserRole }): Observable<StaffDto> {
+    return this.http.post<StaffDto>(`${this.root}/api/staff`, body);
+  }
+
+  updateStaff(id: number, role: UserRole, isActive: boolean): Observable<StaffDto> {
+    return this.http.put<StaffDto>(`${this.root}/api/staff/${id}`, { role, isActive });
+  }
+
+  resetStaffPassword(id: number, password: string): Observable<void> {
+    return this.http.put<void>(`${this.root}/api/staff/${id}/password`, { password });
+  }
+
+  emailSettings(): Observable<EmailSettingsDto> {
+    return this.http.get<EmailSettingsDto>(`${this.root}/api/email-settings`);
+  }
+
+  updateEmailSettings(managerEmail: string, alertsEnabled: boolean): Observable<EmailSettingsDto> {
+    return this.http.put<EmailSettingsDto>(`${this.root}/api/email-settings`, { managerEmail, alertsEnabled });
+  }
+
+  testEmail(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.root}/api/email-settings/test`, {});
   }
 }

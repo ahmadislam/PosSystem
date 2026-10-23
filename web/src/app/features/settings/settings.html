@@ -1,0 +1,83 @@
+<h1>Settings</h1>
+<p class="muted">Manage staff access and configure the recipient for email reports and alerts.</p>
+
+<section class="panel">
+  <h2>Email delivery</h2>
+  @if (email(); as config) {
+    <p>
+      SMTP status:
+      <strong [class.enabled]="config.smtpEnabled" [class.disabled]="!config.smtpEnabled">
+        {{ config.smtpEnabled ? 'Enabled on server' : 'Not configured / disabled' }}
+      </strong>
+    </p>
+    @if (!config.smtpEnabled) {
+      <p class="muted">Configure SMTP host, port, sender, TLS, and credentials as server environment secrets; then set Email__Enabled=true and restart the API.</p>
+    }
+    <label>Manager email recipient
+      <input type="email" required maxlength="200" [(ngModel)]="managerEmail" placeholder="manager@example.com" />
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" [(ngModel)]="alertsEnabled" />
+      Send low-stock alerts (requires SMTP to be enabled)
+    </label>
+    <div class="actions">
+      <button type="button" [disabled]="savingEmail()" (click)="saveEmailSettings()">
+        {{ savingEmail() ? 'Saving…' : 'Save email settings' }}
+      </button>
+      @if (auth.role() === 'Admin') {
+        <button type="button" class="ghost" [disabled]="testingEmail() || !config.smtpEnabled || !managerEmail" (click)="sendTestEmail()">
+          {{ testingEmail() ? 'Sending…' : 'Send test email' }}
+        </button>
+      }
+    </div>
+    <p class="muted">Daily reports are sent at midnight UTC for the previous UTC day when SMTP is enabled. Test mail goes to the configured manager address.</p>
+  } @else {
+    <p class="muted">Loading email settings…</p>
+  }
+</section>
+
+@if (auth.role() === 'Admin') {
+  <section class="panel">
+    <h2>Staff accounts</h2>
+    <form class="create-form" (ngSubmit)="createStaff()">
+      <label>Username <input name="username" required minlength="3" maxlength="50" [(ngModel)]="username" /></label>
+      <label>Email <input name="staffEmail" type="email" required maxlength="200" [(ngModel)]="staffEmail" /></label>
+      <label>Temporary password <input name="password" type="password" required minlength="12" maxlength="128" [(ngModel)]="password" /></label>
+      <label>Role
+        <select name="role" [(ngModel)]="role">
+          <option value="Cashier">Cashier</option>
+          <option value="Manager">Manager</option>
+          <option value="Admin">Admin</option>
+        </select>
+      </label>
+      <button type="submit">Create account</button>
+    </form>
+    <p class="muted">Passwords require at least 12 characters. Passwords are hashed; existing passwords cannot be viewed. Role/status changes and password resets revoke refresh sessions; already-issued access tokens expire within the configured token lifetime.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Reset password</th></tr></thead>
+        <tbody>
+          @for (user of staff(); track user.id) {
+            <tr>
+              <td>{{ user.username }}</td>
+              <td>{{ user.email }}</td>
+              <td>
+                <select [ngModel]="user.role" (ngModelChange)="updateStaff(user, $event, user.isActive)">
+                  <option value="Cashier">Cashier</option><option value="Manager">Manager</option><option value="Admin">Admin</option>
+                </select>
+              </td>
+              <td><label class="checkbox"><input type="checkbox" [ngModel]="user.isActive" (ngModelChange)="updateStaff(user, user.role, $event)" /> Active</label></td>
+              <td>{{ user.createdAt | date:'mediumDate' }}</td>
+              <td class="password-cell">
+                <input type="password" [attr.aria-label]="'New password for ' + user.username" minlength="12" maxlength="128" [(ngModel)]="passwordDrafts[user.id]" placeholder="12+ characters" />
+                <button type="button" class="tiny" (click)="resetPassword(user)">Reset</button>
+              </td>
+            </tr>
+          } @empty {
+            @if (!loading()) { <tr><td colspan="6" class="empty">No staff accounts found.</td></tr> }
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+}

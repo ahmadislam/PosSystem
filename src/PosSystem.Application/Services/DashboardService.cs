@@ -33,6 +33,38 @@ public class DashboardService(IAppDbContext db) : IDashboardService
             .Select(g => new DailySalesDto(g.Key, g.Sum(s => s.TotalAmount)))
             .OrderBy(d => d.Date)
             .ToListAsync(ct);
+        var monthlyTotals = await sales
+            .GroupBy(s => new { s.SaleDate.Year, s.SaleDate.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Revenue = g.Sum(s => s.TotalAmount) })
+            .OrderBy(g => g.Year)
+            .ThenBy(g => g.Month)
+            .ToListAsync(ct);
+        var monthlyRevenue = monthlyTotals
+            .Select(g => new MonthlyRevenueDto(new DateTime(g.Year, g.Month, 1, 0, 0, 0, DateTimeKind.Utc), g.Revenue))
+            .ToList();
+
+        var saleItems = from sale in sales
+                        join item in db.SaleItems.AsNoTracking() on sale.Id equals item.SaleId
+                        select item;
+        var topSellingProducts = await saleItems
+            .GroupBy(item => new { item.Sku, item.ProductName })
+            .Select(group => new TopSellingProductDto(
+                group.Key.Sku, group.Key.ProductName, group.Sum(item => item.Quantity), group.Sum(item => item.LineTotal)))
+            .OrderByDescending(product => product.QuantitySold)
+            .ThenByDescending(product => product.Revenue)
+            .Take(5)
+            .ToListAsync(ct);
+
+        var salesByCategory = await (
+                from item in saleItems
+                join product in db.Products.IgnoreQueryFilters().AsNoTracking() on item.ProductId equals product.Id
+                join category in db.Categories.IgnoreQueryFilters().AsNoTracking() on product.CategoryId equals category.Id
+                group item by new { category.Id, category.Name } into categoryGroup
+                orderby categoryGroup.Sum(item => item.LineTotal) descending
+                select new CategorySalesDto(
+                    categoryGroup.Key.Id, categoryGroup.Key.Name,
+                    categoryGroup.Sum(item => item.Quantity), categoryGroup.Sum(item => item.LineTotal)))
+            .ToListAsync(ct);
         var recentSales = await sales
             .Include(s => s.Items)
             .OrderByDescending(s => s.SaleDate)
@@ -54,6 +86,9 @@ public class DashboardService(IAppDbContext db) : IDashboardService
             revenue,
             lowStockCount,
             dailySales,
+            monthlyRevenue,
+            topSellingProducts,
+            salesByCategory,
             recentSales.Select(ToSaleDto).ToList(),
             lowStockProducts.Select(ToProductDto).ToList());
     }
@@ -61,7 +96,7 @@ public class DashboardService(IAppDbContext db) : IDashboardService
     private static SaleDto ToSaleDto(Sale sale) => new(
         sale.Id, sale.InvoiceNumber, sale.SaleDate, sale.Subtotal, sale.DiscountAmount,
         sale.TaxAmount, sale.TotalAmount, sale.PaymentMethod, sale.Status,
-        sale.Items.Select(i => new SaleItemDto(i.ProductId, i.Sku, i.ProductName, i.Quantity, i.UnitPrice,
+        sale.Items.Select(i => new SaleItemDto(i.Id, i.ProductId, i.Sku, i.ProductName, i.Quantity, i.UnitPrice,
             i.DiscountAmount, i.TaxAmount, i.LineTotal)).ToList());
 
     private static ProductDto ToProductDto(Product product) => new(

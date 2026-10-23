@@ -11,10 +11,12 @@
     <nav>
       <a routerLink="/pos" routerLinkActive="on">Register</a>
       <a routerLink="/shifts" routerLinkActive="on">Shift</a>
+      <a routerLink="/sales" routerLinkActive="on">Sales</a>
       @if (auth.isStaff()) {
         <a routerLink="/dashboard" routerLinkActive="on">Dashboard</a>
         <a routerLink="/inventory" routerLinkActive="on">Inventory</a>
-        <a routerLink="/sales" routerLinkActive="on">Sales</a>
+        <a routerLink="/history" routerLinkActive="on">History</a>
+        <a routerLink="/settings" routerLinkActive="on">Settings</a>
       }
     </nav>
 

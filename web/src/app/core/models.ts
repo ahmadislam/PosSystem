@@ -5,6 +5,23 @@ export interface AuthResponse {
   role: string;
 }
 
+export type UserRole = 'Admin' | 'Manager' | 'Cashier';
+
+export interface StaffDto {
+  id: number;
+  username: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface EmailSettingsDto {
+  smtpEnabled: boolean;
+  managerEmail: string | null;
+  alertsEnabled: boolean;
+}
+
 export interface PagedResult<T> {
   items: T[];
   page: number;
@@ -51,6 +68,8 @@ export interface ProductRequest {
 export type PaymentMethod = 'Cash' | 'Card' | 'Online';
 export type SaleStatus = 'Completed' | 'PartiallyReturned' | 'Refunded';
 export type ShiftStatus = 'Open' | 'PendingClose' | 'Closed';
+export type StockMovementType = 'Purchase' | 'Sale' | 'Return' | 'Adjustment';
+export type AuditAction = 'Create' | 'Update' | 'Delete';
 
 export interface ShiftDto {
   id: number;
@@ -65,6 +84,7 @@ export interface ShiftDto {
 }
 
 export interface SaleItemDto {
+  saleItemId: number;
   productId: number;
   sku: string;
   productName: string;
@@ -88,6 +108,33 @@ export interface SaleDto {
   items: SaleItemDto[];
 }
 
+export interface SaleReturnItemDto {
+  saleItemId: number;
+  productId: number;
+  sku: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  lineTotal: number;
+}
+
+export interface SaleReturnDto {
+  id: number;
+  saleId: number;
+  shiftId: number;
+  processedByUserId: number;
+  refundDate: string;
+  refundMethod: PaymentMethod;
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  items: SaleReturnItemDto[];
+}
+
 export interface DailySalesDto {
   date: string;
   revenue: number;
@@ -98,8 +145,57 @@ export interface DashboardSummaryDto {
   revenue: number;
   lowStockCount: number;
   dailySales: DailySalesDto[];
+  monthlyRevenue: MonthlyRevenueDto[];
+  topSellingProducts: TopSellingProductDto[];
+  salesByCategory: CategorySalesDto[];
   recentSales: SaleDto[];
   lowStockProducts: ProductDto[];
+}
+
+export interface MonthlyRevenueDto {
+  month: string;
+  revenue: number;
+}
+
+export interface TopSellingProductDto {
+  sku: string;
+  productName: string;
+  quantitySold: number;
+  revenue: number;
+}
+
+export interface CategorySalesDto {
+  categoryId: number;
+  categoryName: string;
+  quantitySold: number;
+  revenue: number;
+}
+
+export interface AuditLogDto {
+  id: number;
+  timestamp: string;
+  userId: number | null;
+  username: string | null;
+  action: AuditAction;
+  entityName: string;
+  entityId: string;
+  oldValues: string | null;
+  newValues: string | null;
+}
+
+export interface StockMovementDto {
+  id: number;
+  createdAt: string;
+  productId: number;
+  sku: string;
+  productName: string;
+  createdByUserId: number;
+  username: string | null;
+  type: StockMovementType;
+  quantityChange: number;
+  referenceType: string | null;
+  referenceId: number | null;
+  note: string | null;
 }
 
 export interface CartLine {

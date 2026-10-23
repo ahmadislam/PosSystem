@@ -1,0 +1,19 @@
+h1 { margin: 0 0 0.2rem; }
+.muted { color: var(--muted); }
+.panel { margin-top: 1.25rem; padding: 1rem; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--panel); }
+.panel h2 { margin-top: 0; }
+label { display: flex; flex-direction: column; gap: 0.3rem; color: var(--muted); font-size: 0.82rem; }
+.checkbox { flex-direction: row; align-items: center; }
+.actions, .create-form { display: flex; align-items: end; gap: 0.75rem; flex-wrap: wrap; }
+.create-form { margin: 1rem 0; }
+.create-form label { min-width: 10rem; flex: 1; }
+.enabled { color: var(--accent); }
+.disabled { color: #e0b07a; }
+.table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 0.6rem; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 0.65rem; border-bottom: 1px solid var(--line); text-align: left; }
+th { white-space: nowrap; }
+.password-cell { min-width: 15rem; }
+.password-cell input { width: 9rem; }
+.tiny { margin-left: 0.3rem; background: none; border: 0; color: var(--accent); cursor: pointer; }
+.empty { color: var(--muted); text-align: center; }

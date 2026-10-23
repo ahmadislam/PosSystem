@@ -20,6 +20,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
+    public DbSet<SaleReturn> SaleReturns => Set<SaleReturn>();
+    public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Setting> Settings => Set<Setting>();
 
@@ -91,6 +93,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         });
 
         b.Entity<SaleItem>(e => e.HasOne(i => i.Product).WithMany().HasForeignKey(i => i.ProductId));
+
+        b.Entity<SaleReturn>(e =>
+        {
+            e.HasIndex(r => new { r.SaleId, r.RefundDate });
+            e.HasOne(r => r.Sale).WithMany().HasForeignKey(r => r.SaleId);
+            e.HasOne(r => r.Shift).WithMany().HasForeignKey(r => r.ShiftId);
+            e.HasOne(r => r.ProcessedByUser).WithMany().HasForeignKey(r => r.ProcessedByUserId);
+        });
+
+        b.Entity<SaleReturnItem>(e =>
+        {
+            e.HasIndex(i => i.SaleItemId);
+            e.HasOne(i => i.SaleReturn).WithMany(r => r.Items).HasForeignKey(i => i.SaleReturnId);
+            e.HasOne(i => i.SaleItem).WithMany().HasForeignKey(i => i.SaleItemId);
+            e.HasOne(i => i.Product).WithMany().HasForeignKey(i => i.ProductId);
+        });
 
         b.Entity<AuditLog>(e =>
         {

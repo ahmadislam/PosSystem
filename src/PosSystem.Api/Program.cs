@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -16,6 +17,21 @@ var jwt = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
           ?? throw new InvalidOperationException("Missing 'Jwt' configuration section.");
 if (jwt.Key.Length < 32) throw new InvalidOperationException("Jwt:Key must be at least 32 characters.");
 
+if (builder.Environment.IsProduction())
+{
+    if (jwt.Key == "CHANGE_ME_use_a_long_random_secret_of_at_least_32_chars")
+        throw new InvalidOperationException("Set Jwt:Key to a unique random secret in Production.");
+    var adminPassword = builder.Configuration["Seed:AdminPassword"];
+    if (string.IsNullOrWhiteSpace(adminPassword) || adminPassword.Length < 12 || adminPassword == "Admin@12345")
+        throw new InvalidOperationException("Set Seed:AdminPassword to a unique password of at least 12 characters in Production.");
+}
+
+var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
+if (!EmailOptions.IsValid(emailOptions))
+    throw new InvalidOperationException("Email SMTP configuration is invalid. Verify host, port, sender address, TLS settings, and SMTP credential pairing.");
+if (builder.Environment.IsProduction() && !emailOptions.Enabled)
+    throw new InvalidOperationException("SMTP email delivery must be configured and enabled in Production.");
+
 builder.Services.AddSingleton(jwt);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddPosServices(builder.Configuration);
@@ -23,7 +39,6 @@ builder.Services.AddPosServices(builder.Configuration);
 var connectionString = builder.Configuration.GetConnectionString("Default");
 if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("Missing 'ConnectionStrings:Default' configuration.");
-
 builder.Services.AddHangfire(configuration => configuration
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
@@ -69,7 +84,8 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database");
 
 var app = builder.Build();
 
@@ -83,9 +99,23 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 await DbSeeder.SeedAsync(app.Services, app.Configuration);
-RecurringJob.AddOrUpdate<DailySalesReportJob>(
-    "daily-sales-summary",
-    job => job.SendAsync(CancellationToken.None),
-    Cron.Daily,
-    TimeZoneInfo.Utc);
+if (app.Configuration.GetValue<bool>("Email:Enabled"))
+{
+    RecurringJob.AddOrUpdate<DailySalesReportJob>(
+        "daily-sales-summary",
+        job => job.SendAsync(CancellationToken.None),
+        Cron.Daily,
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    RecurringJob.AddOrUpdate<DailySalesReportJob>(
+        "monthly-sales-summary",
+        job => job.SendMonthlyAsync(CancellationToken.None),
+        "15 0 1 * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+}
+else
+{
+    RecurringJob.RemoveIfExists("daily-sales-summary");
+    RecurringJob.RemoveIfExists("monthly-sales-summary");
+    app.Logger.LogInformation("Email delivery is disabled; the daily sales report is not scheduled.");
+}
 app.Run();

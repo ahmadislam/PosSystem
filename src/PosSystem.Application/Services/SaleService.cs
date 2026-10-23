@@ -25,12 +25,15 @@ public class SaleService(IAppDbContext db, ICurrentUser current, ILowStockNotifi
         if (ids.Count != request.Items.Count)
             throw new BadRequestException("Each product may appear once; increase the quantity instead.");
 
-        var shift = await db.CashierShifts.FirstOrDefaultAsync(s => s.CashierId == userId && s.Status == ShiftStatus.Open, ct)
-            ?? throw new BadRequestException("Open a shift before making sales.");
-
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         try
         {
+            var shiftId = await db.Database
+                .SqlQuery<int>($"SELECT \"Id\" AS \"Value\" FROM \"CashierShifts\" WHERE \"CashierId\" = {userId} AND \"Status\" = {(int)ShiftStatus.Open} FOR UPDATE")
+                .SingleOrDefaultAsync(ct);
+            if (shiftId == 0) throw new BadRequestException("Open a shift before making sales.");
+
+            var shift = await db.CashierShifts.FirstAsync(s => s.Id == shiftId, ct);
             var products = await db.Products.Where(p => ids.Contains(p.Id) && p.IsActive).ToDictionaryAsync(p => p.Id, ct);
             var sale = new Sale
             {
@@ -90,6 +93,7 @@ public class SaleService(IAppDbContext db, ICurrentUser current, ILowStockNotifi
     {
         var sale = await db.Sales.AsNoTracking().Include(s => s.Items).FirstOrDefaultAsync(s => s.Id == id, ct)
             ?? throw new NotFoundException("Sale not found.");
+        EnsureCanAccess(sale);
         return ToDto(sale);
     }
 
@@ -99,6 +103,12 @@ public class SaleService(IAppDbContext db, ICurrentUser current, ILowStockNotifi
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = db.Sales.AsNoTracking().Include(s => s.Items).AsQueryable();
+        if (current.Role is not ("Admin" or "Manager"))
+        {
+            var userId = current.UserId ?? throw new UnauthorizedAppException("Not signed in.");
+            if (current.Role != "Cashier") throw new ForbiddenException("You cannot view sales.");
+            query = query.Where(s => s.CashierId == userId);
+        }
         if (from.HasValue)
         {
             var f = DateTime.SpecifyKind(from.Value.Date, DateTimeKind.Utc);
@@ -115,8 +125,15 @@ public class SaleService(IAppDbContext db, ICurrentUser current, ILowStockNotifi
         return new PagedResult<SaleDto>(items.Select(ToDto).ToList(), page, pageSize, total);
     }
 
+    private void EnsureCanAccess(Sale sale)
+    {
+        var userId = current.UserId ?? throw new UnauthorizedAppException("Not signed in.");
+        if (current.Role is "Admin" or "Manager" || current.Role == "Cashier" && sale.CashierId == userId) return;
+        throw new ForbiddenException("You can only view sales that you processed.");
+    }
+
     private static SaleDto ToDto(Sale s) => new(s.Id, s.InvoiceNumber, s.SaleDate, s.Subtotal, s.DiscountAmount,
         s.TaxAmount, s.TotalAmount, s.PaymentMethod, s.Status,
-        s.Items.Select(i => new SaleItemDto(i.ProductId, i.Sku, i.ProductName, i.Quantity, i.UnitPrice,
+        s.Items.Select(i => new SaleItemDto(i.Id, i.ProductId, i.Sku, i.ProductName, i.Quantity, i.UnitPrice,
             i.DiscountAmount, i.TaxAmount, i.LineTotal)).ToList());
 }

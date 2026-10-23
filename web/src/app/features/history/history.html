@@ -1,0 +1,78 @@
+<h1>History</h1>
+<p class="muted">Review staff audit events and inventory stock movements.</p>
+
+<div class="tabs" role="tablist" aria-label="History type">
+  <button type="button" role="tab" [attr.aria-selected]="tab() === 'audit'" [class.active]="tab() === 'audit'" (click)="selectTab('audit')">Audit log</button>
+  <button type="button" role="tab" [attr.aria-selected]="tab() === 'stock'" [class.active]="tab() === 'stock'" (click)="selectTab('stock')">Stock movements</button>
+</div>
+
+<div class="filters">
+  <label>From <input type="date" [(ngModel)]="from" /></label>
+  <label>To <input type="date" [(ngModel)]="to" /></label>
+  @if (tab() === 'audit') {
+    <label>Entity <input type="text" maxlength="100" [(ngModel)]="entityName" placeholder="e.g. Product" /></label>
+    <label>Action
+      <select [(ngModel)]="action">
+        <option value="">All actions</option>
+        <option value="Create">Create</option>
+        <option value="Update">Update</option>
+        <option value="Delete">Delete</option>
+      </select>
+    </label>
+  } @else {
+    <label>Product ID <input type="number" min="1" step="1" [(ngModel)]="productId" /></label>
+  }
+  <button type="button" (click)="filter()">Apply filters</button>
+</div>
+
+@if (tab() === 'audit') {
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Entity ID</th><th>Changes</th></tr></thead>
+      <tbody>
+        @for (row of auditRows(); track row.id) {
+          <tr>
+            <td>{{ row.timestamp | date:'short' }}</td>
+            <td>{{ row.username || 'Unknown user' }}</td>
+            <td>{{ row.action }}</td>
+            <td>{{ row.entityName }}</td>
+            <td class="mono">{{ row.entityId }}</td>
+            <td class="changes">
+              @if (row.oldValues) { <details><summary>Before</summary><pre>{{ row.oldValues }}</pre></details> }
+              @if (row.newValues) { <details><summary>After</summary><pre>{{ row.newValues }}</pre></details> }
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading()) { <tr><td colspan="6" class="empty">No audit events found.</td></tr> }
+        }
+      </tbody>
+    </table>
+  </div>
+} @else {
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>Product</th><th>SKU</th><th>Type</th><th class="number">Change</th><th>User</th><th>Reference / note</th></tr></thead>
+      <tbody>
+        @for (row of stockRows(); track row.id) {
+          <tr>
+            <td>{{ row.createdAt | date:'short' }}</td>
+            <td>{{ row.productName }}</td>
+            <td class="mono">{{ row.sku }}</td>
+            <td>{{ row.type }}</td>
+            <td class="number">{{ row.quantityChange > 0 ? '+' : '' }}{{ row.quantityChange }}</td>
+            <td>{{ row.username || 'Unknown user' }}</td>
+            <td>{{ row.referenceType || '—' }}{{ row.referenceId ? ' #' + row.referenceId : '' }}{{ row.note ? ' · ' + row.note : '' }}</td>
+          </tr>
+        } @empty {
+          @if (!loading()) { <tr><td colspan="7" class="empty">No stock movements found.</td></tr> }
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+<div class="pager">
+  <button type="button" class="ghost" [disabled]="loading() || (tab() === 'audit' ? auditPage() <= 1 : stockPage() <= 1)" (click)="movePage(-1)">Previous</button>
+  <span>Page {{ tab() === 'audit' ? auditPage() : stockPage() }} of {{ tab() === 'audit' ? auditPages() : stockPages() }}</span>
+  <button type="button" class="ghost" [disabled]="loading() || (tab() === 'audit' ? auditPage() >= auditPages() : stockPage() >= stockPages())" (click)="movePage(1)">Next</button>
+</div>

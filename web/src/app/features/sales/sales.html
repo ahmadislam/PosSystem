@@ -4,7 +4,18 @@
 <div class="toolbar">
   <label>From <input type="date" [(ngModel)]="from" /></label>
   <label>To <input type="date" [(ngModel)]="to" /></label>
-  <button type="button" class="ghost" (click)="load()">Filter</button>
+  <button type="button" class="ghost" (click)="filter()">Filter</button>
+  @if (auth.isStaff()) {
+    <button type="button" [disabled]="downloadingReport()" (click)="downloadReport()">
+      {{ downloadingReport() ? 'Preparing…' : 'Export .xlsx' }}
+    </button>
+  }
+</div>
+
+<div class="pager">
+  <button type="button" class="ghost" [disabled]="page() <= 1" (click)="movePage(-1)">Previous</button>
+  <span>Page {{ page() }} of {{ totalPages() }}</span>
+  <button type="button" class="ghost" [disabled]="page() >= totalPages()" (click)="movePage(1)">Next</button>
 </div>
 
 <div class="table-wrap">
@@ -22,9 +33,78 @@
           <td>{{ s.paymentMethod }}</td>
           <td>{{ s.status }}</td>
           <td class="n">{{ money(s.totalAmount) }}</td>
-          <td><button type="button" class="tiny" (click)="print(s)">Receipt</button></td>
+          <td class="actions">
+            <button type="button" class="tiny" (click)="print(s)">Receipt</button>
+            <button type="button" class="tiny" (click)="openReturns(s)">{{ s.status === 'Refunded' ? 'Returns' : 'Return' }}</button>
+          </td>
         </tr>
+      } @empty {
+        <tr><td colspan="6" class="empty">No sales match this date range.</td></tr>
       }
     </tbody>
   </table>
 </div>
+<div class="pager bottom-pager">
+  <button type="button" class="ghost" [disabled]="page() <= 1" (click)="movePage(-1)">Previous</button>
+  <span>Page {{ page() }} of {{ totalPages() }}</span>
+  <button type="button" class="ghost" [disabled]="page() >= totalPages()" (click)="movePage(1)">Next</button>
+</div>
+
+@if (returningSale(); as sale) {
+  <div class="modal-backdrop">
+    <section class="return-modal" role="dialog" aria-modal="true" [attr.aria-label]="'Returns for ' + sale.invoiceNumber">
+      <header>
+        <div>
+          <h2>Return items</h2>
+          <p class="muted">{{ sale.invoiceNumber }} · Original payment: {{ sale.paymentMethod }}</p>
+        </div>
+        <button type="button" class="ghost" (click)="closeReturns()">Close</button>
+      </header>
+
+      <label>
+        Refund method
+        <select [(ngModel)]="refundMethod">
+          <option value="Cash">Cash</option>
+          <option value="Card">Card</option>
+          <option value="Online">Online</option>
+        </select>
+      </label>
+      <p class="muted">Refund totals are calculated from the original sale prices, discount, and tax.</p>
+
+      <div class="return-lines">
+        @for (item of sale.items; track item.saleItemId) {
+          <div class="return-line">
+            <div>
+              <strong>{{ item.productName }}</strong>
+              <span class="muted">{{ item.sku }} · {{ returnedQuantity(item.saleItemId) }} returned ·
+                {{ item.quantity - returnedQuantity(item.saleItemId) }} remaining</span>
+            </div>
+            <label>
+              Return qty
+              <input type="number" min="0" [max]="item.quantity - returnedQuantity(item.saleItemId)"
+                [disabled]="loadingReturnHistory() || item.quantity === returnedQuantity(item.saleItemId)"
+                [ngModel]="returnQuantities()[item.saleItemId] ?? 0"
+                (ngModelChange)="setReturnQuantity(item.saleItemId, $event, item.quantity - returnedQuantity(item.saleItemId))" />
+            </label>
+          </div>
+        }
+      </div>
+
+      @if (returnHistory().length > 0) {
+        <section class="return-history">
+          <h3>Previous returns</h3>
+          @for (entry of returnHistory(); track entry.id) {
+            <p>{{ entry.refundDate | date:'short' }} · {{ entry.refundMethod }} · {{ money(entry.totalAmount) }}</p>
+          }
+        </section>
+      }
+
+      <footer>
+        <button type="button" class="ghost" (click)="closeReturns()">Cancel</button>
+        <button type="button" [disabled]="loadingReturnHistory() || submittingReturn()" (click)="submitReturn()">
+          {{ loadingReturnHistory() ? 'Loading…' : submittingReturn() ? 'Recording…' : 'Record return' }}
+        </button>
+      </footer>
+    </section>
+  </div>
+}

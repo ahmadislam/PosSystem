@@ -34,6 +34,9 @@ export class Inventory implements OnInit {
   readonly categories = signal<CategoryDto[]>([]);
   readonly products = signal<ProductDto[]>([]);
   readonly total = signal(0);
+  readonly page = signal(1);
+  readonly totalPages = signal(1);
+  readonly downloadingReport = signal(false);
   readonly editingId = signal<number | null>(null);
   readonly formOpen = signal(false);
   form: ProductRequest = emptyForm();
@@ -48,13 +51,35 @@ export class Inventory implements OnInit {
   }
 
   load(): void {
-    this.api.products({ search: this.search.trim() || undefined, lowStockOnly: this.lowStockOnly, pageSize: 100 }).subscribe({
+    this.api.products({
+      search: this.search.trim() || undefined,
+      lowStockOnly: this.lowStockOnly,
+      page: this.page(),
+      pageSize: 50,
+    }).subscribe({
       next: (p) => {
+        const pages = Math.max(p.totalPages, 1);
+        if (this.page() > pages) {
+          this.page.set(pages);
+          this.load();
+          return;
+        }
         this.products.set(p.items);
         this.total.set(p.totalCount);
+        this.totalPages.set(pages);
       },
       error: (e) => this.toast.show(apiError(e), 'err'),
     });
+  }
+
+  filter(): void {
+    this.page.set(1);
+    this.load();
+  }
+
+  movePage(delta: number): void {
+    this.page.update((page) => Math.max(1, Math.min(this.totalPages(), page + delta)));
+    this.load();
   }
 
   addCategory(): void {
@@ -138,6 +163,25 @@ export class Inventory implements OnInit {
         this.load();
       },
       error: (e) => this.toast.show(apiError(e), 'err'),
+    });
+  }
+
+  downloadReport(): void {
+    this.downloadingReport.set(true);
+    this.api.inventoryReport().subscribe({
+      next: (file) => {
+        const url = URL.createObjectURL(file);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `inventory-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        this.downloadingReport.set(false);
+      },
+      error: (error) => {
+        this.downloadingReport.set(false);
+        this.toast.show(apiError(error), 'err');
+      },
     });
   }
 }

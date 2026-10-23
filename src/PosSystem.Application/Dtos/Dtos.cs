@@ -11,6 +11,32 @@ public class LoginRequest
 }
 public record AuthResponse(string AccessToken, DateTime ExpiresAt, string Username, string Role);
 
+// ---- Staff ----
+public class CreateStaffRequest
+{
+    [Required, StringLength(50, MinimumLength = 3)] public string Username { get; set; } = string.Empty;
+    [Required, EmailAddress, StringLength(200)] public string Email { get; set; } = string.Empty;
+    [Required, MinLength(12), StringLength(128)] public string Password { get; set; } = string.Empty;
+    [EnumDataType(typeof(UserRole))] public UserRole Role { get; set; } = UserRole.Cashier;
+}
+public class UpdateStaffRequest
+{
+    [EnumDataType(typeof(UserRole))] public UserRole Role { get; set; }
+    public bool IsActive { get; set; }
+}
+public class ResetStaffPasswordRequest
+{
+    [Required, MinLength(12), StringLength(128)] public string Password { get; set; } = string.Empty;
+}
+public record StaffDto(int Id, string Username, string Email, UserRole Role, bool IsActive, DateTime CreatedAt);
+
+public class UpdateEmailSettingsRequest
+{
+    [Required, EmailAddress, StringLength(200)] public string ManagerEmail { get; set; } = string.Empty;
+    public bool AlertsEnabled { get; set; }
+}
+public record EmailSettingsDto(bool SmtpEnabled, string? ManagerEmail, bool AlertsEnabled);
+
 // ---- Categories ----
 public class CategoryRequest
 {
@@ -61,18 +87,47 @@ public class CreateSaleRequest
     public PaymentMethod PaymentMethod { get; set; }
     [Required, MinLength(1)] public List<SaleLineRequest> Items { get; set; } = new();
 }
-public record SaleItemDto(int ProductId, string Sku, string ProductName, int Quantity, decimal UnitPrice,
+public record SaleItemDto(int SaleItemId, int ProductId, string Sku, string ProductName, int Quantity, decimal UnitPrice,
     decimal DiscountAmount, decimal TaxAmount, decimal LineTotal);
 public record SaleDto(int Id, string InvoiceNumber, DateTime SaleDate, decimal Subtotal, decimal DiscountAmount,
     decimal TaxAmount, decimal TotalAmount, PaymentMethod PaymentMethod, SaleStatus Status,
     IReadOnlyList<SaleItemDto> Items);
 
+public class SaleReturnLineRequest
+{
+    [Range(1, int.MaxValue)] public int SaleItemId { get; set; }
+    [Range(1, 100000)] public int Quantity { get; set; }
+}
+public class CreateSaleReturnRequest
+{
+    public PaymentMethod RefundMethod { get; set; }
+    [Required, MinLength(1)] public List<SaleReturnLineRequest> Items { get; set; } = new();
+}
+public record SaleReturnItemDto(int SaleItemId, int ProductId, string Sku, string ProductName, int Quantity,
+    decimal UnitPrice, decimal Subtotal, decimal DiscountAmount, decimal TaxAmount, decimal LineTotal);
+public record SaleReturnDto(int Id, int SaleId, int ShiftId, int ProcessedByUserId, DateTime RefundDate,
+    PaymentMethod RefundMethod, decimal Subtotal, decimal DiscountAmount, decimal TaxAmount, decimal TotalAmount,
+    IReadOnlyList<SaleReturnItemDto> Items);
+
 // ---- Dashboard ----
 public record DailySalesDto(DateTime Date, decimal Revenue);
+public record MonthlyRevenueDto(DateTime Month, decimal Revenue);
+public record TopSellingProductDto(string Sku, string ProductName, int QuantitySold, decimal Revenue);
+public record CategorySalesDto(int CategoryId, string CategoryName, int QuantitySold, decimal Revenue);
 public record DashboardSummaryDto(
     int TotalSales,
     decimal Revenue,
     int LowStockCount,
     IReadOnlyList<DailySalesDto> DailySales,
+    IReadOnlyList<MonthlyRevenueDto> MonthlyRevenue,
+    IReadOnlyList<TopSellingProductDto> TopSellingProducts,
+    IReadOnlyList<CategorySalesDto> SalesByCategory,
     IReadOnlyList<SaleDto> RecentSales,
     IReadOnlyList<ProductDto> LowStockProducts);
+
+// ---- History ----
+public record AuditLogDto(int Id, DateTime Timestamp, int? UserId, string? Username, AuditAction Action,
+    string EntityName, string EntityId, string? OldValues, string? NewValues);
+public record StockMovementDto(int Id, DateTime CreatedAt, int ProductId, string Sku, string ProductName,
+    int CreatedByUserId, string? Username, StockMovementType Type, int QuantityChange,
+    string? ReferenceType, int? ReferenceId, string? Note);

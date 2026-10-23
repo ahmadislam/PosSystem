@@ -1,16 +1,28 @@
 using Hangfire;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using PosSystem.Application.Common;
 
 namespace PosSystem.Infrastructure.Services;
 
-public class HangfireLowStockNotifier(IBackgroundJobClient jobs) : ILowStockNotifier
+public class HangfireLowStockNotifier(
+    IAppDbContext db,
+    IBackgroundJobClient jobs,
+    IOptions<EmailOptions> options) : ILowStockNotifier
 {
-    public Task CheckAsync(IEnumerable<int> productIds, CancellationToken ct = default)
+    public async Task CheckAsync(IEnumerable<int> productIds, CancellationToken ct = default)
     {
-        var ids = productIds.Distinct().ToArray();
-        if (ids.Length == 0) return Task.CompletedTask;
+        if (!options.Value.Enabled) return;
 
-        jobs.Enqueue<LowStockEmailJob>(job => job.SendAsync(ids, CancellationToken.None));
-        return Task.CompletedTask;
+        var ids = productIds.Distinct().ToArray();
+        if (ids.Length == 0) return;
+
+        var lowStockIds = await db.Products.AsNoTracking()
+            .Where(p => ids.Contains(p.Id) && p.StockQuantity <= p.MinStockThreshold)
+            .Select(p => p.Id)
+            .ToArrayAsync(ct);
+        if (lowStockIds.Length == 0) return;
+
+        jobs.Enqueue<LowStockEmailJob>(job => job.SendAsync(lowStockIds, CancellationToken.None));
     }
 }

@@ -8,3 +8,52 @@ th, td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--line); text-al
 .n { text-align: right; font-family: var(--mono); }
 .mono { font-family: var(--mono); }
 .tiny { background: none; border: 0; color: var(--accent); cursor: pointer; }
+.actions { white-space: nowrap; }
+.pager { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; color: var(--muted); }
+.bottom-pager { margin-top: 0.75rem; }
+.empty { color: var(--muted); text-align: center; }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 65%);
+}
+.return-modal {
+  width: min(42rem, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--panel);
+}
+.return-modal header, .return-modal footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.return-modal h2, .return-modal h3, .return-modal p { margin-top: 0; }
+.return-modal label { display: flex; flex-direction: column; gap: 0.35rem; }
+.return-lines { display: grid; gap: 0.75rem; margin: 1rem 0; }
+.return-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+}
+.return-line > div { display: grid; gap: 0.2rem; }
+.return-line input { width: 6rem; }
+.return-history { padding-top: 0.5rem; border-top: 1px solid var(--line); }
+.return-history p { margin: 0.35rem 0; }
+.return-modal footer { justify-content: flex-end; margin-top: 1rem; }
+@media (max-width: 34rem) {
+  .return-line { align-items: stretch; flex-direction: column; }
+  .return-line input { width: 100%; }
+}

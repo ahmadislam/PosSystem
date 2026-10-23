@@ -18,12 +18,36 @@ jobs:
       - run: dotnet build --no-restore -c Release
       - run: dotnet test --no-build -c Release
 
-  # Add a 'web' job here when the Angular app exists (npm ci, ng build, ng test).
+  web:
+    runs-on: ubuntu-latest
+    env:
+      NG_BUILD_SASS_EMBEDDED: 'false'
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm test -- --watch=false
+      - run: npm run build
 
   deploy:
-    needs: [api]
+    needs: [api, web]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
     steps:
       # Render: turn OFF auto-deploy for the service and use its Deploy Hook so only tested code ships.
-      - run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+      - name: Trigger Render deploy when configured
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK is not configured; skipping optional Render deployment."
+          else
+            curl --fail --silent --show-error -X POST "$RENDER_DEPLOY_HOOK"
+          fi

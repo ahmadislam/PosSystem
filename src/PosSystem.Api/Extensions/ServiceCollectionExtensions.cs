@@ -6,7 +6,6 @@ using PosSystem.Application.Services;
 using PosSystem.Domain.Entities;
 using PosSystem.Infrastructure.Persistence;
 using PosSystem.Infrastructure.Services;
-using MimeKit;
 
 namespace PosSystem.Api.Extensions;
 
@@ -24,13 +23,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddOptions<EmailOptions>()
             .Bind(config.GetSection(EmailOptions.SectionName))
-            .Validate(options =>
-                !options.Enabled ||
-                (!string.IsNullOrWhiteSpace(options.SmtpHost)
-                 && options.SmtpPort is > 0 and <= 65535
-                 && MailboxAddress.TryParse(options.SenderAddress, out _)
-                 && !(options.UseStartTls && options.UseSslOnConnect)
-                 && (string.IsNullOrWhiteSpace(options.Username) == string.IsNullOrWhiteSpace(options.Password))),
+            .Validate(EmailOptions.IsValid,
                 "Enabled email requires valid SMTP host, port, sender address, TLS mode, and matching SMTP credentials.")
             .ValidateOnStart();
         services.AddTransient<IEmailSender, SmtpEmailSender>();
@@ -43,7 +36,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IShiftService, ShiftService>();
         services.AddScoped<ISaleService, SaleService>();
+        services.AddScoped<ISaleReturnService, SaleReturnService>();
         services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IHistoryService, HistoryService>();
+        services.AddScoped<IExcelReportService, ExcelReportService>();
+        services.AddScoped<IStaffService, StaffService>();
         return services;
     }
 }

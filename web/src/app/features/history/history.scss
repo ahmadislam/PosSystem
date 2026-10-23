@@ -1,0 +1,20 @@
+h1 { margin: 0 0 0.2rem; }
+.muted { color: var(--muted); }
+.tabs, .filters, .pager { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.tabs { margin: 1rem 0; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; border-radius: 0.5rem 0.5rem 0 0; background: transparent; color: var(--muted); }
+.tabs button.active { background: var(--panel-2); color: var(--text); }
+.filters { align-items: end; margin: 1rem 0; }
+label { display: flex; flex-direction: column; gap: 0.25rem; color: var(--muted); font-size: 0.8rem; }
+.table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 0.8rem; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { white-space: nowrap; }
+.mono, .number { font-family: var(--mono); }
+.number { text-align: right; }
+.changes { min-width: 12rem; }
+details { margin: 0.2rem 0; }
+summary { color: var(--accent); cursor: pointer; }
+pre { max-width: 24rem; max-height: 15rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.empty { color: var(--muted); text-align: center; }
+.pager { justify-content: flex-end; margin-top: 1rem; }

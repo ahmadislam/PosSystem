@@ -22,20 +22,27 @@ export class Dashboard implements OnInit {
   readonly revenue = signal(0);
   readonly count = signal(0);
   readonly bars = signal<{ label: string; value: number; pct: number }[]>([]);
+  readonly monthlyBars = signal<{ label: string; value: number; pct: number }[]>([]);
+  readonly topProducts = signal<DashboardSummaryDto['topSellingProducts']>([]);
+  readonly categoryBars = signal<{ label: string; value: number; quantity: number; pct: number }[]>([]);
 
   ngOnInit(): void {
     const end = new Date();
-    const start = new Date(end);
-    start.setDate(start.getDate() - 6);
+    const monthStart = new Date(end.getFullYear(), end.getMonth() - 11, 1);
+    const weekStart = new Date(end);
+    weekStart.setDate(weekStart.getDate() - 6);
 
-    this.api.dashboardSummary(localDate(start), localDate(end)).subscribe({
+    this.api.dashboardSummary(localDate(monthStart), localDate(end)).subscribe({
       next: (summary) => {
         this.sales.set(summary.recentSales);
         this.count.set(summary.totalSales);
         this.revenue.set(summary.revenue);
         this.lowStockCount.set(summary.lowStockCount);
         this.lowStock.set(summary.lowStockProducts);
-        this.bars.set(buildBars(summary.dailySales, start, 7));
+        this.bars.set(buildDailyBars(summary.dailySales, weekStart, 7));
+        this.monthlyBars.set(buildMonthlyBars(summary.monthlyRevenue));
+        this.topProducts.set(summary.topSellingProducts);
+        this.categoryBars.set(buildCategoryBars(summary.salesByCategory));
       },
       error: (e) => this.toast.show(apiError(e), 'err'),
     });
@@ -49,7 +56,7 @@ function localDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function buildBars(dailySales: DashboardSummaryDto['dailySales'], start: Date, days: number) {
+function buildDailyBars(dailySales: DashboardSummaryDto['dailySales'], start: Date, days: number) {
   const revenueByDate = new Map(dailySales.map((day) => [day.date.slice(0, 10), day.revenue]));
   const buckets = Array.from({ length: days }, (_, index) => {
     const date = new Date(start);
@@ -62,4 +69,29 @@ function buildBars(dailySales: DashboardSummaryDto['dailySales'], start: Date, d
   });
   const max = Math.max(1, ...buckets.map((bucket) => bucket.value));
   return buckets.map((bucket) => ({ label: bucket.label, value: bucket.value, pct: (bucket.value / max) * 100 }));
+}
+
+function buildMonthlyBars(months: DashboardSummaryDto['monthlyRevenue']) {
+  const revenueByMonth = new Map(months.map((month) => [month.month.slice(0, 7), month.revenue]));
+  const now = new Date();
+  const buckets = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11 + index, 1));
+    const key = date.toISOString().slice(0, 7);
+    return {
+      label: date.toLocaleDateString(undefined, { month: 'short', year: '2-digit', timeZone: 'UTC' }),
+      value: revenueByMonth.get(key) ?? 0,
+    };
+  });
+  const max = Math.max(1, ...buckets.map((bucket) => bucket.value));
+  return buckets.map((bucket) => ({ ...bucket, pct: Math.max(bucket.value > 0 ? 3 : 0, (bucket.value / max) * 100) }));
+}
+
+function buildCategoryBars(categories: DashboardSummaryDto['salesByCategory']) {
+  const max = Math.max(1, ...categories.map((category) => category.revenue));
+  return categories.map((category) => ({
+    label: category.categoryName,
+    value: category.revenue,
+    quantity: category.quantitySold,
+    pct: Math.max(category.revenue > 0 ? 3 : 0, (category.revenue / max) * 100),
+  }));
 }

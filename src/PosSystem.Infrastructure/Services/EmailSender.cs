@@ -18,6 +18,14 @@ public sealed class EmailOptions
     public string SenderName { get; set; } = "POS System";
     public bool UseStartTls { get; set; } = true;
     public bool UseSslOnConnect { get; set; }
+
+    public static bool IsValid(EmailOptions options) =>
+        !options.Enabled ||
+        (!string.IsNullOrWhiteSpace(options.SmtpHost)
+         && options.SmtpPort is > 0 and <= 65535
+         && MailboxAddress.TryParse(options.SenderAddress, out _)
+         && options.UseStartTls != options.UseSslOnConnect
+         && (string.IsNullOrWhiteSpace(options.Username) == string.IsNullOrWhiteSpace(options.Password)));
 }
 
 public interface IEmailSender

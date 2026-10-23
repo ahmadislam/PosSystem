@@ -14,6 +14,8 @@ public interface IAppDbContext
     DbSet<CashierShift> CashierShifts { get; }
     DbSet<Sale> Sales { get; }
     DbSet<SaleItem> SaleItems { get; }
+    DbSet<SaleReturn> SaleReturns { get; }
+    DbSet<SaleReturnItem> SaleReturnItems { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<Setting> Settings { get; }
     DatabaseFacade Database { get; }
@@ -33,7 +35,7 @@ public interface ITokenService
     string HashToken(string rawToken);
 }
 
-/// <summary>Called AFTER a sale is committed. Phase 2 swaps the logger for a Hangfire email job.</summary>
+/// <summary>Called after a sale commits to enqueue alerts for products that are now below threshold.</summary>
 public interface ILowStockNotifier
 {
     Task CheckAsync(IEnumerable<int> productIds, CancellationToken ct = default);
