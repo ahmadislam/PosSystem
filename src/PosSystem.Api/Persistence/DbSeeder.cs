@@ -28,6 +28,8 @@ public static class DbSeeder
             db.Users.Add(admin);
         }
 
+        await ApplyAdminPasswordRecoveryAsync(db, hasher, config, scope.ServiceProvider);
+
         if (!await db.Settings.AnyAsync())
         {
             db.Settings.AddRange(
@@ -46,6 +48,44 @@ public static class DbSeeder
 
         if (config.GetValue<bool>("Seed:DemoData"))
             await SeedDemoDataAsync(db);
+    }
+
+    private static async Task ApplyAdminPasswordRecoveryAsync(
+        AppDbContext db,
+        IPasswordHasher<User> hasher,
+        IConfiguration config,
+        IServiceProvider services)
+    {
+        var password = config["Recovery:AdminPassword"];
+        var requestId = config["Recovery:RequestId"];
+        if (string.IsNullOrWhiteSpace(password) && string.IsNullOrWhiteSpace(requestId)) return;
+
+        if (string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(requestId))
+            throw new InvalidOperationException("Set both Recovery:AdminPassword and Recovery:RequestId to reset an Admin password.");
+        if (password.Length < 12)
+            throw new InvalidOperationException("Recovery:AdminPassword must be at least 12 characters.");
+        if (requestId.Length is < 16 or > 64 || requestId.Any(character => !char.IsLetterOrDigit(character) && character != '-'))
+            throw new InvalidOperationException("Recovery:RequestId must contain 16 to 64 letters, digits, or hyphens.");
+
+        var marker = $"AdminPasswordRecovery:{requestId}";
+        if (await db.Settings.AnyAsync(setting => setting.SettingKey == marker)) return;
+
+        var username = config["Recovery:AdminUsername"]?.Trim();
+        username = string.IsNullOrWhiteSpace(username) ? "admin" : username;
+        var user = db.Users.Local.SingleOrDefault(candidate => string.Equals(candidate.Username, username, StringComparison.OrdinalIgnoreCase))
+                   ?? await db.Users.SingleOrDefaultAsync(candidate => candidate.Username.ToLower() == username.ToLower())
+                   ?? throw new InvalidOperationException($"Recovery Admin user '{username}' was not found.");
+
+        user.PasswordHash = hasher.HashPassword(user, password);
+        var activeTokens = await db.RefreshTokens
+            .Where(token => token.UserId == user.Id && token.RevokedAt == null)
+            .ToListAsync();
+        foreach (var token in activeTokens) token.RevokedAt = DateTime.UtcNow;
+        db.Settings.Add(new Setting { SettingKey = marker, Value = DateTime.UtcNow.ToString("O") });
+        await db.SaveChangesAsync();
+
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("PasswordRecovery");
+        logger.LogWarning("A server-side password recovery was applied for Admin user {Username}. Remove Recovery configuration from the host now.", username);
     }
 
     private static async Task SeedDemoDataAsync(AppDbContext db)
