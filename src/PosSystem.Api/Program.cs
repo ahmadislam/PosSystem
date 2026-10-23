@@ -12,6 +12,7 @@ using PosSystem.Application.Common;
 using PosSystem.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var forwardedHeaders = TrustedProxyConfiguration.Create(builder.Configuration.GetSection("ReverseProxy"));
 
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
           ?? throw new InvalidOperationException("Missing 'Jwt' configuration section.");
@@ -50,6 +51,7 @@ builder.Services.AddControllers()
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
 {
     o.MapInboundClaims = false;   // keep "sub" / "role" claim names as issued
+    o.EventsType = typeof(AuthorizationStateJwtEvents);
     o.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true, ValidIssuer = jwt.Issuer,
@@ -87,6 +89,8 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// Must precede authentication/limiting so only trusted proxies can supply the client IP/scheme.
+app.UseForwardedHeaders(forwardedHeaders);
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSwagger();       // public on purpose: the live Swagger link goes on your CV
 app.UseSwaggerUI();

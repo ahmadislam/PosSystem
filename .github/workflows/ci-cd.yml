@@ -2,9 +2,11 @@ name: CI-CD
 
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   api:
@@ -16,7 +18,7 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
-      - run: dotnet test --no-build -c Release
+      - run: dotnet test tests/PosSystem.Tests -c Release --no-build
 
   web:
     runs-on: ubuntu-latest
@@ -37,14 +39,103 @@ jobs:
       - run: npm test -- --watch=false
       - run: npm run build
 
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      # Test-only server; every integration test owns a disposable pos_it_* database.
+      POS_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
+      POS_REQUIRE_POSTGRES_TESTS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test tests/PosSystem.IntegrationTests -c Release --no-build --logger "trx;LogFileName=integration.trx" --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-results
+          path: TestResults
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pos_e2e
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pos_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      POS_E2E_CONNECTION: Host=127.0.0.1;Port=5432;Database=pos_e2e;Username=postgres;Password=postgres
+      NG_BUILD_SASS_EMBEDDED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: dotnet build -c Release
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run e2e
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-results
+          path: |
+            web/playwright-report
+            web/test-results
+
+  backup-restore:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/test-backup-restore.sh
+        env:
+          PG_DOCKER_CONTAINER: ${{ job.services.postgres.id }}
+
   deploy:
-    needs: [api, web]
+    needs: [api, web, integration, e2e, backup-restore]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
     steps:
-      # Render: turn OFF auto-deploy for the service and use its Deploy Hook so only tested code ships.
+      # Disable provider Git auto-deploy; these hooks run only after all readiness checks.
       - name: Trigger Render deploy when configured
         run: |
           if [ -z "$RENDER_DEPLOY_HOOK" ]; then

@@ -16,6 +16,8 @@ const sale: SaleDto = {
   couponCode: null,
   loyaltyPointsEarned: 0,
   loyaltyPointsRedeemed: 0,
+  cashTendered: 20,
+  changeDue: 0.65,
   items: [{
     saleItemId: 1,
     productId: 1,
@@ -59,6 +61,9 @@ describe('InvoiceService', () => {
     expect(printAnchor?.rel).toContain('noopener');
     const pdfBytes = new Uint8Array(await pdfBlobs[0].arrayBuffer());
     expect(new TextDecoder().decode(pdfBytes.slice(0, 5))).toBe('%PDF-');
+    const contents = new TextDecoder().decode(pdfBytes);
+    expect(contents).toContain('(Cash tendered)');
+    expect(contents).toContain('(Change due)');
   });
 
   it('downloads a generated PDF using a safe object URL and invoice filename', () => {

@@ -151,6 +151,7 @@ public class SaleLineRequest
 public class CreateSaleRequest
 {
     public PaymentMethod PaymentMethod { get; set; }
+    [Range(0, 1000000000)] public decimal? CashTendered { get; set; }
     [Range(1, int.MaxValue)] public int? CustomerId { get; set; }
     [StringLength(40)] public string? CouponCode { get; set; }
     [Range(0, 100000000)] public int LoyaltyPointsToRedeem { get; set; }
@@ -161,7 +162,8 @@ public record SaleItemDto(int SaleItemId, int ProductId, string Sku, string Prod
 public record SaleDto(int Id, string InvoiceNumber, DateTime SaleDate, decimal Subtotal, decimal DiscountAmount,
     decimal TaxAmount, decimal TotalAmount, PaymentMethod PaymentMethod, SaleStatus Status,
     IReadOnlyList<SaleItemDto> Items, int? CustomerId = null, string? CustomerName = null, string? CouponCode = null,
-    int LoyaltyPointsEarned = 0, int LoyaltyPointsRedeemed = 0);
+    int LoyaltyPointsEarned = 0, int LoyaltyPointsRedeemed = 0,
+    decimal? CashTendered = null, decimal? ChangeDue = null);
 
 public class SaleReturnLineRequest
 {

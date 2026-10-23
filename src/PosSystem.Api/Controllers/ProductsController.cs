@@ -17,6 +17,10 @@ public class ProductsController(IProductService products, ProductImageStorage im
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ProductDto>> Get(int id, CancellationToken ct) => Ok(await products.GetAsync(id, ct));
 
+    [HttpGet("by-sku/{sku}")]
+    public async Task<ActionResult<ProductDto>> GetBySku(string sku, CancellationToken ct) =>
+        Ok(await products.GetBySkuAsync(sku, ct));
+
     [HttpPost, Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<ProductDto>> Create(ProductRequest request, CancellationToken ct)
     {

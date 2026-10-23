@@ -10,6 +10,7 @@ public interface IProductService
 {
     Task<PagedResult<ProductDto>> SearchAsync(string? search, int? categoryId, bool lowStockOnly, int page, int pageSize, CancellationToken ct = default);
     Task<ProductDto> GetAsync(int id, CancellationToken ct = default);
+    Task<ProductDto> GetBySkuAsync(string sku, CancellationToken ct = default);
     Task<ProductDto> CreateAsync(ProductRequest request, CancellationToken ct = default);
     Task<ProductDto> UpdateAsync(int id, ProductRequest request, CancellationToken ct = default);
     Task<ProductDto> AdjustStockAsync(int id, StockAdjustRequest request, CancellationToken ct = default);
@@ -44,6 +45,19 @@ public class ProductService(IAppDbContext db, ICurrentUser current, ILowStockNot
         var product = await db.Products.AsNoTracking().Include(p => p.Category)
             .Include(p => p.Images.Where(i => i.IsPrimary)).FirstOrDefaultAsync(p => p.Id == id, ct)
             ?? throw new NotFoundException("Product not found.");
+        return ToDto(product);
+    }
+
+    public async Task<ProductDto> GetBySkuAsync(string sku, CancellationToken ct = default)
+    {
+        var normalized = sku.Trim().ToUpperInvariant();
+        if (normalized.Length is 0 or > 50)
+            throw new BadRequestException("SKU must contain between 1 and 50 characters.");
+
+        var product = await db.Products.AsNoTracking().Include(p => p.Category)
+            .Include(p => p.Images.Where(i => i.IsPrimary))
+            .SingleOrDefaultAsync(p => p.Sku == normalized && p.IsActive, ct)
+            ?? throw new NotFoundException("No active product has that SKU.");
         return ToDto(product);
     }
 

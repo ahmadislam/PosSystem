@@ -27,6 +27,14 @@ public class SaleService(
         var userId = current.UserId ?? throw new UnauthorizedAppException("Not signed in.");
         if (request.Items.Count == 0) throw new BadRequestException("A sale needs at least one item.");
         if (!Enum.IsDefined(request.PaymentMethod)) throw new BadRequestException("Payment method is invalid.");
+        if (request.PaymentMethod == PaymentMethod.Cash)
+        {
+            if (!request.CashTendered.HasValue || request.CashTendered < 0 || request.CashTendered > 1_000_000_000m
+                || decimal.Round(request.CashTendered.Value, 2) != request.CashTendered)
+                throw new BadRequestException("Cash tendered is required and must be a nonnegative amount with at most two decimal places.");
+        }
+        else if (request.CashTendered.HasValue)
+            throw new BadRequestException("Cash tendered applies only to cash payments.");
         if (request.LoyaltyPointsToRedeem < 0) throw new BadRequestException("Loyalty points to redeem cannot be negative.");
         if (!Guid.TryParse(idempotencyKey, out var parsedKey))
             throw new BadRequestException("A valid Idempotency-Key UUID header is required.");
@@ -90,6 +98,9 @@ public class SaleService(
                 decimal eligibleSubtotal = 0;
                 foreach (var line in request.Items)
                 {
+                    if (line.Quantity <= 0) throw new BadRequestException("Quantity must be positive.");
+                    if (line.DiscountAmount < 0 || decimal.Round(line.DiscountAmount, 2) != line.DiscountAmount)
+                        throw new BadRequestException("Line discounts must be nonnegative amounts with at most two decimal places.");
                     if (!products.TryGetValue(line.ProductId, out var product))
                         throw new NotFoundException($"Product {line.ProductId} not found or inactive.");
                     if (product.StockQuantity < line.Quantity)
@@ -122,8 +133,8 @@ public class SaleService(
                         throw new BadRequestException("Loyalty redemption cannot exceed the remaining eligible subtotal.");
                 }
                 var additionalDiscount = couponDiscount + redemptionDiscount;
-                var totalBaseAfterManual = eligibleSubtotal;
-                decimal allocatedAdditionalDiscount = 0m;
+                var additionalDiscounts = DiscountAllocator.Allocate(additionalDiscount,
+                    request.Items.Select(line => products[line.ProductId].SalePrice * line.Quantity - line.DiscountAmount).ToArray());
                 var sale = new Sale
                 {
                     CashierId = userId, ShiftId = shift.Id, SaleDate = DateTime.UtcNow,
@@ -138,12 +149,7 @@ public class SaleService(
                 {
                     var line = request.Items[index];
                     var product = products[line.ProductId];
-                    var lineEligible = product.SalePrice * line.Quantity - line.DiscountAmount;
-                    var lineAdditional = index == request.Items.Count - 1
-                        ? additionalDiscount - allocatedAdditionalDiscount
-                        : totalBaseAfterManual == 0 ? 0 : Math.Round(additionalDiscount * lineEligible / totalBaseAfterManual, 2, MidpointRounding.AwayFromZero);
-                    allocatedAdditionalDiscount += lineAdditional;
-                    var discount = line.DiscountAmount + lineAdditional;
+                    var discount = line.DiscountAmount + additionalDiscounts[index];
 
                     var (gross, tax, total) = PricingCalculator.CalculateLine(product.SalePrice, line.Quantity, discount, product.TaxRate);
                     product.StockQuantity -= line.Quantity;   // RowVersion (xmin) guards against concurrent sales
@@ -157,6 +163,14 @@ public class SaleService(
                     sale.DiscountAmount += discount;
                 sale.TaxAmount += tax;
                 sale.TotalAmount += total;
+            }
+
+            if (request.PaymentMethod == PaymentMethod.Cash)
+            {
+                if (request.CashTendered!.Value < sale.TotalAmount)
+                    throw new BadRequestException($"Cash tendered must cover the current sale total of {sale.TotalAmount:0.00}.");
+                sale.CashTendered = request.CashTendered;
+                sale.ChangeDue = request.CashTendered.Value - sale.TotalAmount;
             }
 
             if (coupon is not null) coupon.RedemptionCount++;
@@ -225,6 +239,7 @@ public class SaleService(
         var canonical = JsonSerializer.Serialize(new
         {
             request.PaymentMethod,
+            request.CashTendered,
             request.CustomerId,
             CouponCode = request.CouponCode?.Trim().ToUpperInvariant(),
             request.LoyaltyPointsToRedeem,
@@ -289,5 +304,5 @@ public class SaleService(
         s.TaxAmount, s.TotalAmount, s.PaymentMethod, s.Status,
         s.Items.Select(i => new SaleItemDto(i.Id, i.ProductId, i.Sku, i.ProductName, i.Quantity, i.UnitPrice,
         i.DiscountAmount, i.TaxAmount, i.LineTotal)).ToList(), s.CustomerId, s.Customer?.Name, s.Coupon?.Code,
-    s.LoyaltyPointsEarned, s.LoyaltyPointsRedeemed);
+    s.LoyaltyPointsEarned, s.LoyaltyPointsRedeemed, s.CashTendered, s.ChangeDue);
 }

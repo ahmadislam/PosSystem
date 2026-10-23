@@ -1,6 +1,12 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
 using PosSystem.Api.Controllers;
 using PosSystem.Api.Persistence;
@@ -27,6 +33,50 @@ public class AuthSecurityTests
         Assert.False(AuthOriginPolicy.IsAllowed("https://shop.example.com/other", configured));
         Assert.False(AuthOriginPolicy.IsAllowed(null, configured));
         Assert.False(AuthOriginPolicy.IsAllowed("null", configured));
+    }
+
+    [Fact]
+    public void Cookie_endpoints_allow_explicit_same_origin_for_swagger_but_reject_hostile_or_missing_origins()
+    {
+        var configured = new[] { "https://shop.example.com" };
+        const string api = "https://api.example.com:8443";
+
+        Assert.True(AuthOriginPolicy.IsAllowed(api, configured, api));
+        Assert.True(AuthOriginPolicy.IsAllowed("https://shop.example.com", configured, api));
+        Assert.False(AuthOriginPolicy.IsAllowed("http://api.example.com:8443", configured, api));
+        Assert.False(AuthOriginPolicy.IsAllowed("https://api.example.com", configured, api));
+        Assert.False(AuthOriginPolicy.IsAllowed("https://api.example.com.attacker.test:8443", configured, api));
+        Assert.False(AuthOriginPolicy.IsAllowed("https://api.example.com:8443/other", configured, api));
+        Assert.False(AuthOriginPolicy.IsAllowed("https://api.example.com:8443, https://attacker.test", configured, api));
+        Assert.False(AuthOriginPolicy.IsAllowed("https://api.example.com:8443@attacker.test", configured, api));
+        Assert.False(AuthOriginPolicy.IsAllowed(null, configured, api));
+        Assert.False(AuthOriginPolicy.IsAllowed("null", configured, api));
+    }
+
+    [Theory]
+    [InlineData("https://api.example.com:8443", 401)]
+    [InlineData("https://shop.example.com", 401)]
+    [InlineData("https://attacker.test", 403)]
+    [InlineData("http://api.example.com:8443", 403)]
+    [InlineData(null, 403)]
+    public async Task Refresh_controller_uses_its_own_origin_without_accepting_untrusted_requests(string? origin, int expectedStatus)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Cors:Origins:0"] = "https://shop.example.com"
+        }).Build();
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
+        context.Request.Host = new HostString("api.example.com", 8443);
+        if (origin is not null) context.Request.Headers["Origin"] = origin;
+        var controller = new AuthController(null!, configuration, new LoginAttemptLimiter())
+        {
+            ControllerContext = new ControllerContext { HttpContext = context }
+        };
+
+        // No cookie means 401 after the origin policy succeeds; hostile origins fail earlier with 403.
+        var response = await controller.Refresh(default);
+        Assert.Equal(expectedStatus, Assert.IsAssignableFrom<IStatusCodeActionResult>(response.Result).StatusCode);
     }
 
     [Fact]
@@ -66,7 +116,7 @@ public class AuthSecurityTests
     }
 
     [Fact]
-    public async Task Authorization_change_makes_existing_access_principal_unauthenticated()
+    public async Task Authorization_change_fails_bearer_authentication_for_existing_access_token()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -83,12 +133,23 @@ public class AuthSecurityTests
             new Claim("sub", user.Id.ToString()),
             new Claim(AuthorizationStamp.ClaimType, AuthorizationStamp.Create(user, jwt.Key))
         ], "Bearer"));
-        var transformation = new AuthorizationStateClaimsTransformation(db, jwt);
+        var validator = new AuthorizationStateValidator(db, jwt);
+        var events = new AuthorizationStateJwtEvents(validator);
+        TokenValidatedContext Context() => new(new DefaultHttpContext(),
+            new AuthenticationScheme(JwtBearerDefaults.AuthenticationScheme, null, typeof(JwtBearerHandler)),
+            new JwtBearerOptions()) { Principal = principal };
 
-        Assert.True((await transformation.TransformAsync(principal)).Identity?.IsAuthenticated == true);
+        var valid = Context();
+        await events.TokenValidated(valid);
+        Assert.Null(valid.Result);
+        Assert.True(await validator.IsValidAsync(principal));
         user.Role = PosSystem.Domain.Enums.UserRole.Admin;
         await db.SaveChangesAsync();
-        Assert.False((await transformation.TransformAsync(principal)).Identity?.IsAuthenticated == true);
+        var revoked = Context();
+        await events.TokenValidated(revoked);
+        Assert.NotNull(revoked.Result?.Failure);
+        Assert.False(revoked.Result.Succeeded);
+        Assert.False(await validator.IsValidAsync(principal));
     }
 
     [Fact]

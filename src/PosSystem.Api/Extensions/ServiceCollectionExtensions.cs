@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication;
 using PosSystem.Api.Controllers;
 using Microsoft.EntityFrameworkCore;
 using PosSystem.Api.Persistence;
@@ -21,7 +20,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
-        services.AddScoped<IClaimsTransformation, AuthorizationStateClaimsTransformation>();
+        services.AddScoped<AuthorizationStateValidator>();
+        services.AddScoped<AuthorizationStateJwtEvents>();
         services.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<ITokenService, JwtTokenService>();

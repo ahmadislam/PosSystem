@@ -5,14 +5,21 @@ namespace PosSystem.Api.Controllers;
 
 public static class AuthOriginPolicy
 {
-    public static bool IsAllowed(string? origin, IEnumerable<string> allowedOrigins)
+    public static bool IsAllowed(string? origin, IEnumerable<string> allowedOrigins, string? requestOrigin = null)
     {
-        if (!TryParseOrigin(origin, out var requestOrigin)) return false;
+        // An absent/opaque Origin is never enough to authenticate a cookie endpoint.
+        // Swagger is safe when the browser's explicit Origin equals this API's origin.
+        if (!TryParseOrigin(origin, out var suppliedOrigin)) return false;
+        if (TryParseOrigin(requestOrigin, out var sameOrigin) && OriginsMatch(suppliedOrigin, sameOrigin))
+            return true;
         return allowedOrigins.Any(allowed =>
             TryParseOrigin(allowed, out var allowedOrigin) &&
-            string.Equals(requestOrigin.GetLeftPart(UriPartial.Authority),
-                allowedOrigin.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase));
+            OriginsMatch(suppliedOrigin, allowedOrigin));
     }
+
+    private static bool OriginsMatch(Uri first, Uri second) =>
+        string.Equals(first.GetLeftPart(UriPartial.Authority), second.GetLeftPart(UriPartial.Authority),
+            StringComparison.OrdinalIgnoreCase);
 
     private static bool TryParseOrigin(string? value, out Uri origin)
     {

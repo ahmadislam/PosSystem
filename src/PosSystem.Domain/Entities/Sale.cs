@@ -23,6 +23,8 @@ public class Sale : BaseEntity, ISoftDelete
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
+    public decimal? CashTendered { get; set; }
+    public decimal? ChangeDue { get; set; }
     public PaymentMethod PaymentMethod { get; set; }
     public SaleStatus Status { get; set; } = SaleStatus.Completed;
     public bool IsDeleted { get; set; }

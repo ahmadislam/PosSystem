@@ -73,7 +73,8 @@ public class AuthController(IAuthService auth, IConfiguration configuration, ILo
 
     private bool HasAllowedOrigin() => AuthOriginPolicy.IsAllowed(
         Request.Headers["Origin"].ToString(),
-        configuration.GetSection("Cors:Origins").Get<string[]>() ?? []);
+        configuration.GetSection("Cors:Origins").Get<string[]>() ?? [],
+        $"{Request.Scheme}://{Request.Host.ToUriComponent()}");
 
     // Frontend (Vercel) and API (Render) are on different sites, so SameSite=None + Secure is required.
     private static CookieOptions CookieOptions(DateTimeOffset expires) => new()

@@ -86,6 +86,13 @@ export class InvoiceService {
       doc.text(money(value), 195, y, { align: 'right' });
       y += 6;
     }
+    if (sale.cashTendered !== null && sale.cashTendered !== undefined && sale.changeDue !== null && sale.changeDue !== undefined) {
+      for (const [label, value] of [['Cash tendered', sale.cashTendered], ['Change due', sale.changeDue]] as const) {
+        doc.text(label, 130, y);
+        doc.text(money(value), 195, y, { align: 'right' });
+        y += 6;
+      }
+    }
     return doc;
   }
 }

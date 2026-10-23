@@ -32,7 +32,7 @@ public class SaleReturnService(IAppDbContext db, ICurrentUser current, ILowStock
             .SingleOrDefaultAsync(ct);
         if (lockedSaleId == 0) throw new NotFoundException("Sale not found.");
 
-        var sale = await db.Sales.Include(s => s.Items).Include(s => s.Customer)
+        var sale = await db.Sales.Include(s => s.Items)
             .FirstOrDefaultAsync(s => s.Id == saleId, ct)
             ?? throw new NotFoundException("Sale not found.");
         EnsureCanAccess(sale, userId);
@@ -143,10 +143,19 @@ public class SaleReturnService(IAppDbContext db, ICurrentUser current, ILowStock
             {
                 var customer = await db.Customers.IgnoreQueryFilters().FirstAsync(c => c.Id == customerId, ct);
                 var cumulativeRefund = (previousItems.Values.Sum(value => value.Total) + saleReturn.TotalAmount);
-                var refundRatio = sale.TotalAmount <= 0 ? 1m : Math.Min(1m, cumulativeRefund / sale.TotalAmount);
+                var cumulativeSubtotal = previousItems.Values.Sum(value => value.Subtotal) + saleReturn.Subtotal;
+                // A fully loyalty-paid sale has no cash refund denominator. Use the
+                // returned merchandise's pre-discount subtotal so a partial return
+                // restores only its proportional points, rather than the whole sale's.
+                var refundRatio = sale.TotalAmount > 0
+                    ? Math.Min(1m, cumulativeRefund / sale.TotalAmount)
+                    : sale.Subtotal > 0
+                        ? Math.Min(1m, cumulativeSubtotal / sale.Subtotal)
+                        : sale.Status == SaleStatus.Refunded ? 1m : 0m;
                 var earnedTarget = (int)Math.Floor(sale.LoyaltyPointsEarned * refundRatio);
                 var earnedReversed = await db.LoyaltyTransactions
-                    .Where(entry => entry.SaleId == sale.Id && entry.Type == "ReturnEarnedReversal")
+                    .Where(entry => entry.SaleReturn != null && entry.SaleReturn.SaleId == sale.Id
+                        && entry.Type == "ReturnEarnedReversal")
                     .SumAsync(entry => (int?)-entry.PointsChange, ct) ?? 0;
                 var earnedDelta = Math.Max(0, earnedTarget - earnedReversed);
                 if (earnedDelta > 0)
@@ -162,7 +171,8 @@ public class SaleReturnService(IAppDbContext db, ICurrentUser current, ILowStock
 
                 var redeemedTarget = (int)Math.Floor(sale.LoyaltyPointsRedeemed * refundRatio);
                 var redeemedRestored = await db.LoyaltyTransactions
-                    .Where(entry => entry.SaleId == sale.Id && entry.Type == "ReturnRedemptionRestore")
+                    .Where(entry => entry.SaleReturn != null && entry.SaleReturn.SaleId == sale.Id
+                        && entry.Type == "ReturnRedemptionRestore")
                     .SumAsync(entry => (int?)entry.PointsChange, ct) ?? 0;
                 var redeemedDelta = Math.Max(0, redeemedTarget - redeemedRestored);
                 if (redeemedDelta > 0)

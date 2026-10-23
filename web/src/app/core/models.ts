@@ -230,6 +230,8 @@ export interface SaleDto {
   couponCode: string | null;
   loyaltyPointsEarned: number;
   loyaltyPointsRedeemed: number;
+  cashTendered: number | null;
+  changeDue: number | null;
 }
 
 export interface SaleReturnItemDto {

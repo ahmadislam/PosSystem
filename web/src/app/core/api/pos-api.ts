@@ -135,6 +135,10 @@ export class PosApi {
     return this.http.post<ProductDto>(`${this.root}/api/products`, body);
   }
 
+  productBySku(sku: string): Observable<ProductDto> {
+    return this.http.get<ProductDto>(`${this.root}/api/products/by-sku/${encodeURIComponent(sku.trim().toUpperCase())}`);
+  }
+
   updateProduct(id: number, body: ProductRequest): Observable<ProductDto> {
     return this.http.put<ProductDto>(`${this.root}/api/products/${id}`, body);
   }
@@ -214,7 +218,7 @@ export class PosApi {
     paymentMethod: PaymentMethod,
     items: { productId: number; quantity: number; discountAmount: number }[],
     idempotencyKey: string,
-    options: { customerId: number | null; couponCode: string | null; loyaltyPointsToRedeem: number },
+    options: { customerId: number | null; couponCode: string | null; loyaltyPointsToRedeem: number; cashTendered: number | null },
   ): Observable<SaleDto> {
     return this.http.post<SaleDto>(
       `${this.root}/api/sales`,

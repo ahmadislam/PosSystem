@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { writeFileSync, rmSync } from 'node:fs';
+import { verifyProductionBuild } from './verify-production-build.mjs';
 
 const configuredOrigin = process.env.POS_API_ORIGIN;
 if (!configuredOrigin) {
@@ -24,6 +25,7 @@ try {
   });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exitCode = result.status ?? 1;
+  else verifyProductionBuild(new URL('../dist/web/browser/', import.meta.url), apiUrl.origin);
 } finally {
   rmSync(runtimeConfigPath, { force: true });
 }

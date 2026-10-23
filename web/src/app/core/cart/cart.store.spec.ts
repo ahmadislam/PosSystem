@@ -40,4 +40,13 @@ describe('CartStore', () => {
     expect(cart.lines()[0].discountAmount).toBe(0);
     expect(cart.preview().total).toBe(10.75);
   });
+
+  it('keeps the existing quantity when numeric input is not finite', () => {
+    const cart = new CartStore();
+    cart.add(product);
+    cart.setQuantity(product.id, Number.NaN);
+    cart.setQuantity(product.id, Number.POSITIVE_INFINITY);
+    expect(cart.lines()[0].quantity).toBe(1);
+    expect(cart.preview().total).toBe(10.75);
+  });
 });

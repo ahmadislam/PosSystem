@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PosApi } from '../../core/api/pos-api';
 import { CartStore } from '../../core/cart/cart.store';
+import { allocateDiscount } from '../../core/cart/discount-allocation';
 import { apiError } from '../../core/http/api-error';
 import { InvoiceService } from '../../core/invoice/invoice.service';
 import { CategoryDto, CouponDto, CustomerDto, LoyaltyRulesDto, PaymentMethod, ProductDto, SaleDto, ShiftDto, lineTotals, money } from '../../core/models';
@@ -81,21 +82,17 @@ export class Pos implements OnInit {
   }
 
   scanBarcode(): void {
-    const barcode = this.barcode.trim();
+    const barcode = this.barcode.trim().toUpperCase();
     if (!barcode) return;
-    this.api.products({ search: barcode, page: 1, pageSize: 20 }).subscribe({
-      next: (result) => {
-        const product = result.items.find((item) => item.sku === barcode);
-        if (!product) {
-          this.toast.show(`No product found for barcode/SKU ${barcode}.`, 'warn');
-          return;
-        }
+    this.api.productBySku(barcode).subscribe({
+      next: (product) => {
         const message = this.cart.add(product);
         if (message) this.toast.show(message, 'warn');
         else this.toast.show(`${product.sku} added to cart.`);
         this.barcode = '';
       },
-      error: (e) => this.toast.show(apiError(e), 'err'),
+      error: (e) => this.toast.show(e.status === 404
+        ? `No product found for barcode/SKU ${barcode}.` : apiError(e), e.status === 404 ? 'warn' : 'err'),
     });
   }
 
@@ -112,6 +109,7 @@ export class Pos implements OnInit {
   }
 
   checkout(): void {
+    if (this.busy()) return;
     const shift = this.shift();
     if (!shift || shift.status !== 'Open') {
       this.toast.show('Open a shift before selling.', 'warn');
@@ -125,7 +123,7 @@ export class Pos implements OnInit {
     const totals = this.promotionPreview();
     const total = totals.total;
     const payment = this.payment;
-    const cashTendered = this.cashTendered;
+    const cashTendered = payment === 'Cash' ? this.cashTendered : null;
     if (payment === 'Cash' && (!Number.isFinite(cashTendered) || (cashTendered ?? -1) < total)) {
       this.toast.show('Cash tendered must be at least the sale total.', 'warn');
       return;
@@ -135,6 +133,7 @@ export class Pos implements OnInit {
       customerId: this.customerId,
       couponCode: this.couponCode.trim().toUpperCase() || null,
       loyaltyPointsToRedeem: this.loyaltyPointsToRedeem,
+      cashTendered,
       items: lines.map((line) => ({
         productId: line.product.id,
         quantity: line.quantity,
@@ -152,12 +151,13 @@ export class Pos implements OnInit {
         customerId: this.customerId,
         couponCode: this.couponCode.trim().toUpperCase() || null,
         loyaltyPointsToRedeem: this.loyaltyPointsToRedeem,
+        cashTendered,
       })
       .subscribe({
         next: (sale) => {
           this.checkoutFingerprint = '';
           this.checkoutKey = '';
-          this.lastChangeDue.set(payment === 'Cash' ? Math.max(0, (cashTendered ?? 0) - total) : null);
+          this.lastChangeDue.set(sale.changeDue);
           this.cart.clear();
           this.cashTendered = null;
           this.couponCode = '';
@@ -204,16 +204,13 @@ export class Pos implements OnInit {
       ? this.roundMoney(this.loyaltyPointsToRedeem / rate) : 0;
     const loyaltyDiscount = Math.min(points, Math.max(0, base - couponDiscount));
     const additionalDiscount = couponDiscount + loyaltyDiscount;
-    let allocated = 0;
+    const additionalAllocations = allocateDiscount(lines.map((line) =>
+      Math.max(0, line.product.salePrice * line.quantity - line.discountAmount)), additionalDiscount);
     const subtotal = lines.reduce((sum, line) => sum + line.product.salePrice * line.quantity, 0);
     let discount = 0;
     let tax = 0;
     lines.forEach((line, index) => {
-      const eligible = Math.max(0, line.product.salePrice * line.quantity - line.discountAmount);
-      const extra = index === lines.length - 1
-        ? additionalDiscount - allocated
-        : base === 0 ? 0 : this.roundMoney(additionalDiscount * eligible / base);
-      allocated += extra;
+      const extra = additionalAllocations[index];
       discount += line.discountAmount + extra;
       tax += lineTotals(line.product.salePrice, line.quantity, line.discountAmount + extra, line.product.taxRate).tax;
     });

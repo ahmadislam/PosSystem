@@ -608,8 +608,16 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal?>("CashTendered")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<int>("CashierId")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("ChangeDue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<int?>("CouponId")
                         .HasColumnType("integer");

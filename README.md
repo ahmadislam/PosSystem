@@ -21,7 +21,7 @@ ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular point
 - Cashier shifts: Open -> PendingClose -> Closed, with cash variance
 - POS sales: transactional stock deduction, race-free invoice numbers, product concurrency protection (xmin), user-scoped idempotent checkout retries
 - Partial sale returns with proportional refunds, optional recorded return reasons, automatic restocking, and cash-refund shift reconciliation
-- Cash tender/change calculation is a register-only cash-handling aid; Cash/Card/Online are recorded as methods and do not initiate or settle external payments
+- Cash checkout validates tender against authoritative server pricing and persists tender/change with the idempotent sale; Cash/Card/Online record methods and do not initiate or settle external payments
 - Hangfire jobs stored in PostgreSQL: durable low-stock alert records with retry/delivery state and manager visibility, plus daily/monthly sales and inventory summaries (SMTP)
 - Soft delete via EF Core global query filters, automatic audit trail (old vs new values)
 - Angular POS, inventory, sales, shift, dashboard, settings, and manager-only audit/stock history screens; inventory and sales lists are paginated, and the dashboard includes daily/monthly revenue, top products, and category sales charts aggregated server-side
@@ -33,8 +33,9 @@ ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular point
 Refresh rotation uses a database transaction and a conditional update of the presented token.
 Only one request can claim an unrevoked token; presenting a rotated token again revokes the
 user's remaining refresh sessions. Refresh/logout (and login, which also issues the cookie)
-require an `Origin` matching one of the exact `Cors:Origins` entries. Missing, `null`, and
-unconfigured origins are rejected.
+require an `Origin` matching one of the exact `Cors:Origins` entries or the API's own verified
+origin (for Swagger). Missing, `null`, malformed, and unrelated origins are rejected. Do not
+replace this policy with a wildcard when allowing a new frontend origin.
 
 Access JWTs carry an HMAC authorization stamp derived from the user's password hash, role,
 and active status. Authentication checks that stamp against the current user record on each
@@ -46,14 +47,34 @@ Login throttling is process-local: five failures for an address/username pair or
 address within a 15-minute window return `429` with `Retry-After`. For multi-instance deployments,
 use a shared distributed limiter so requests cannot evade the per-process counters.
 
+Behind a hosting reverse proxy, configure the actual trusted peer addresses before enabling
+forwarding; otherwise clients can appear to share the proxy's rate-limit bucket. Set
+`ReverseProxy__Enabled=true`, then provide `ReverseProxy__KnownProxies__0` with a specific trusted
+proxy IP or `ReverseProxy__KnownNetworks__0` with a specific trusted CIDR, and set
+`ReverseProxy__ForwardLimit` to the actual number of trusted hops (1–10). Forwarding defaults to
+disabled and enabling it without explicit trust entries fails startup; universal networks are
+rejected. Do not enable the trust-all `ASPNETCORE_FORWARDEDHEADERS_ENABLED` shortcut. Configure
+`AllowedHosts` to the public API host(s). Forwarded host headers are intentionally ignored; configure
+the proxy to preserve the public Host and validate its host routing. Use your provider's current
+network documentation for peer ranges rather than trusting arbitrary X-Forwarded-For values.
+
 ## Run locally
+
+When upgrading, deploy the API and frontend together: cash sale requests now require a
+cent-precision `cashTendered` amount covering the server's current total, and responses include
+the persisted `cashTendered` and `changeDue`. The `AddCashTenderAndChange` migration runs at
+API startup and leaves those fields null on historical sales.
 Prerequisites: .NET 10 SDK, Docker (or any local PostgreSQL; edit `ConnectionStrings:Default`).
 
 ```bash
-./setup.sh                      # one-time: creates projects, installs packages, builds, tests, adds migration
+dotnet restore
+dotnet build -c Release
 docker compose up -d db         # PostgreSQL
 dotnet run --project src/PosSystem.Api --urls http://localhost:5080
 ```
+`setup.sh` is the original project scaffolder, not a dependency installer for an existing checkout;
+do not rerun it over application source. The API applies committed migrations and seeds the local
+development account on startup.
 To run the API container with the local-only development configuration:
 `docker compose --profile full up --build` (API at `http://localhost:8080`). The Compose profile
 explicitly uses Development mode and disabled SMTP so it does not require production-only credentials.
@@ -364,12 +385,16 @@ demonstrate the POS. The API and database must both remain available for the dem
 
 ### 4. CI-gated deploys
 
-GitHub Actions runs the .NET build/tests and Angular tests/production build on Ubuntu for every pull
-request and push to `main`. Local macOS Sass limitations do not affect that Linux build.
-For an API deployment only after both CI jobs pass, disable Render's automatic deploy and configure
+GitHub Actions runs the .NET build/unit tests, Angular tests/production build, real PostgreSQL
+integration tests, Chromium browser workflows, and database/image backup-restore checks on pushes
+and pull requests targeting `main`. Integration tests create and delete their own databases;
+browser tests receive a separate disposable database. Local macOS Sass limitations do not affect
+the Linux build. Test result/trace artifacts are retained when appropriate.
+
+For an API deployment only after all readiness jobs pass, disable Render's automatic deploy and configure
 the repository Actions secret `RENDER_DEPLOY_HOOK`. For the frontend, disable Vercel's automatic Git
 deploy and configure a Vercel Deploy Hook as the repository Actions secret `VERCEL_DEPLOY_HOOK`.
-The deploy job runs only for a push to `main`, after API and web build/test jobs succeed. If a hook
+The deploy job runs only for a push to `main`, after API, web, integration, browser and restore jobs succeed. If a hook
 is absent, that hosting deploy is skipped; the deployment provider, API/database, SMTP, CORS, and
 secrets must still be separately configured. These repository files do not mean a provider account
 or live deployment exists.
@@ -377,24 +402,103 @@ or live deployment exists.
 Deploy a clean baseline on the default branch first. Do not put database URLs, JWT keys, SMTP passwords,
 or deploy hooks in committed files or screenshots.
 
-### Database backup and restore
+### Database and product-image backup/restore
 
-Install PostgreSQL client tools matching the hosted PostgreSQL major version. Store the database URL
-in an environment variable or secret manager, not in shell history or source files:
+The database contains image metadata, while `ProductImages__Directory` contains the files. Recover
+both together. A database-only dump cannot restore uploaded images. Use PostgreSQL client tools
+matching the server major version, Python 3.11+, and a persistent image directory. Supply libpq
+connection configuration (`DATABASE_URL` or `PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER` plus secure
+authentication) through the environment/secret manager. Do not pass the application's .NET
+connection string as `DATABASE_URL` or put credentials into shell history.
+
+Pause application and background-job writes for the entire backup so the SQL snapshot and copied
+image files describe the same state. A bundle contains `database.dump`, `product-images/`, and
+`manifest.json` with SHA-256 hashes of every file. It is created with private permissions and never
+overwrites an existing bundle. `BACKUP_WRITES_PAUSED=1` acknowledges the operator has paused writers;
+the script does not stop a remote application itself.
 
 ```bash
-export DATABASE_URL='postgresql://...'
-./scripts/backup-database.sh ./backups/pos-$(date -u +%Y%m%dT%H%M%SZ).dump
+# Connection variables are already securely injected; image path is the persistent source.
+BACKUP_WRITES_PAUSED=1 PRODUCT_IMAGES_DIRECTORY=/persistent/product-images \
+  ./scripts/backup-state.sh /secure-backups/pos-snapshot
+python3 scripts/backup-manifest.py verify /secure-backups/pos-snapshot
 ```
 
-Restore only to a disposable or intentionally selected target. The restore script prompts before
-replacing objects; run EF migrations and verify `/health` after restoring:
+For a Compose development database, avoid installing host client tools by exporting
+`PG_DOCKER_CONTAINER=possystem-db-1 PGUSER=postgres PGDATABASE=possystem`. The same scripts use the
+PostgreSQL client's container version. Hosted deployments should use their supported secure
+connection and storage backup mechanisms instead.
+
+Restore into an **empty, explicitly selected database** and a new/empty image directory with all
+application/job processes stopped. The script verifies the complete manifest before touching the
+database, refuses an existing database's objects or nonempty image storage, and uses an atomic
+database transaction with `pg_restore --exit-on-error`. The acknowledgement below is required for
+noninteractive operation; it is not a command to erase an existing production database.
 
 ```bash
-export DATABASE_URL='postgresql://...disposable-target...'
-./scripts/restore-database.sh ./backups/pos-backup.dump
+# Set connection variables to a freshly created disposable restore target first.
+RESTORE_TARGET_CONFIRMED=1 ./scripts/restore-state.sh \
+  /secure-backups/pos-snapshot /restore-test/product-images
 ```
 
-The custom-format dump supports `pg_restore --list` for inspection. Keep encrypted/offsite copies
-according to your retention policy, and test restores periodically without using production as the
-test target.
+Then point a test API's connection and `ProductImages__Directory` to those restored targets, let it
+apply any newer committed migrations, check `/health`, sign in, and download a restored product
+image before serving traffic. Store encrypted/offsite copies with a defined retention policy.
+The SHA-256 manifest detects corruption; it does not encrypt or authenticate a backup against an
+attacker who can replace both content and manifest. Keep bundles in access-controlled storage.
+
+Run the automated disposable restore check locally (also required in CI):
+
+```bash
+PG_DOCKER_CONTAINER=possystem-db-1 PGUSER=postgres ./scripts/test-backup-restore.sh
+```
+
+It creates two uniquely named test databases, restores a row and its matching image bytes, checks
+that corruption/nonempty targets are rejected, and deletes its fixtures. Legacy
+`backup-database.sh`/`restore-database.sh` remain database-only utilities; the latter also refuses
+nonempty databases and still prompts before restore.
+
+### Running readiness checks locally
+
+```bash
+dotnet build -c Release
+dotnet test tests/PosSystem.Tests -c Release --no-build
+# Test-only PostgreSQL admin server; tests own and delete pos_it_* databases.
+POS_TEST_POSTGRES='Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres' \
+  dotnet test tests/PosSystem.IntegrationTests -c Release --no-build
+cd web
+npm ci
+npm test -- --watch=false
+POS_API_ORIGIN=https://your-api.example.com npm run build
+npx playwright install --with-deps chromium
+# Create a separate disposable pos_e2e database. Never target a real register database.
+POS_E2E_CONNECTION='Host=127.0.0.1;Port=5432;Database=pos_e2e;Username=postgres;Password=postgres' npm run e2e
+```
+
+PostgreSQL values above are only the documented local Compose defaults. Integration tests skip
+when `POS_TEST_POSTGRES` is absent; CI sets it explicitly so unavailable PostgreSQL fails the job.
+Browser tests start their test API/frontend processes and require the disposable database, rather
+than relying on an already-running development instance. SMTP capture tests exercise real SMTP/TLS
+locally without sending mail to external recipients.
+
+### Production verification
+
+Repository tests cannot provision provider accounts or establish that a live deployment works.
+Before enabling real-store traffic, verify the actual public frontend/API HTTPS origins and exact
+CORS entries, the database connection/health, persistent image disk and backup retention, and SMTP
+sender verification/credentials. Use the application test-email flow and confirm delivery in a
+controlled manager mailbox. Hook configuration, a successful build, or a local SMTP capture is not
+proof of external delivery.
+
+Configure provider credentials and secret values through the hosting/environment settings, never
+in source, shell history, test artifacts or chat. No live Render/Vercel/Supabase/Brevo account or
+delivery is implied by the configuration templates. Local TLS SMTP capture proves the mail code
+can deliver to its test server; public deployment and real mailbox delivery require the configured
+provider account and remain separate checks.
+
+Test each supported browser against the real public origins: login, reload to restore its refresh
+cookie, let access expire and retry a protected request, use two tabs, logout, and verify a disabled
+account loses access. Local proxy browser tests do not reproduce all third-party-cookie policies;
+prefer app/API subdomains under one registrable domain when browser policy blocks cross-site cookies.
+Complete a test shift/sale/return/close, download an invoice and uploaded product image, and inspect
+the scheduled-job delivery/failure state before accepting production transactions.

@@ -37,6 +37,7 @@ export class CartStore {
   }
 
   setQuantity(productId: number, quantity: number): void {
+    if (!Number.isFinite(quantity)) return;
     this.linesSig.update((lines) =>
       lines.flatMap((l) => {
         if (l.product.id !== productId) return [l];
