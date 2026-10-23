@@ -8,7 +8,7 @@ checkout, purchasing, returns and navigation are preserved.
 
 | Requirement | Audit finding and action | Source evidence |
 |---|---|---|
-| Live frontend + backend | Combined Render Docker deployment already supported; clickable project demo/API links added to README. Current public health and deployed revision cannot be verified because this execution environment's proxy returns tunnel `403`. | [`Dockerfile`](../Dockerfile), [`render.yaml`](../render.yaml), [`ClientHosting`](../src/PosSystem.Api/Extensions/ClientHosting.cs), [deployment guide](free-demo.md) |
+| Live frontend + backend | Combined Render Docker deployment is live. Read-only Render API checks confirmed the release branch and live deployment, and independent HTTPS probes returned 200 for health, login and OpenAPI. | [`Dockerfile`](../Dockerfile), [`render.yaml`](../render.yaml), [`ClientHosting`](../src/PosSystem.Api/Extensions/ClientHosting.cs), [deployment guide](free-demo.md) |
 | API documentation | Swagger/OpenAPI already enabled in all environments. Added endpoint reference and corrected the stale low-stock route in README. | [`Program.cs`](../src/PosSystem.Api/Program.cs), [API reference](api.md) |
 | Professional README + images | Missing screenshots were a real gap. Added reproducible screenshots of the application and downloaded PDF using synthetic records; refreshed stack, deployment and storage documentation. | [README](../README.md), [screenshots](screenshots/README.md) |
 | Architecture, ERD, sequence, deployment diagrams | Added diagrams matching actual entities, optional relationships, history retention and deployed PostgreSQL topology. | [Architecture and diagrams](architecture.md) |
@@ -21,7 +21,7 @@ checkout, purchasing, returns and navigation are preserved.
 | Critical indexes | Already present in model and committed migrations: filtered unique Product.Sku, unique Sale.InvoiceNumber, Sale.SaleDate B-tree, cashier/idempotency and active-shift uniqueness. This is PostgreSQL, so SQL Server `NONCLUSTERED` syntax would be incorrect. | [`AppDbContext`](../src/PosSystem.Infrastructure/Persistence/AppDbContext.cs), [migrations](../src/PosSystem.Infrastructure/Persistence/Migrations/) |
 | Heavy dashboard queries | Server-side EF aggregates already avoided loading all sales. Added parameterized EF Core raw SQL for the heavier top-product and category joins/grouping, retaining UTC boundaries, deleted-sale filtering and historical item snapshots. | [`DashboardService`](../src/PosSystem.Application/Services/DashboardService.cs) |
 | Build and automated tests | Six CI jobs already present. Fixed a missing SMTP test-host logger argument that broke the solution build; repaired stale browser selectors and the password field's accessible label after UI changes. Added regression coverage for charts, reporting, audits and query filters. | [workflow](../.github/workflows/ci-cd.yml), [browser tests](../web/e2e/register.spec.ts), [reporting integration tests](../tests/PosSystem.IntegrationTests/ReportingPersistenceTests.cs) |
-| Continuous delivery | Fixed mismatch between main-only deploy job and the deployed `feature/release-readiness` branch. Explicit `DEPLOY_BRANCH` now matches blueprint by default, and CD remains gated on all six jobs. Missing deploy hooks are explicitly reported as skipped. | [workflow](../.github/workflows/ci-cd.yml), [CI/CD setup](ci-cd.md) |
+| Continuous delivery | Fixed the branch mismatch and verified the push pipeline in GitHub Actions: all six readiness jobs passed before the deploy job succeeded. Render Git auto-deploy is off, so unchecked commits cannot bypass the CI gate. | [workflow](../.github/workflows/ci-cd.yml), [verified push run](https://github.com/ahmadislam/PosSystem/actions/runs/40037957626), [CI/CD setup](ci-cd.md) |
 
 ## Verification and limits
 
@@ -37,7 +37,7 @@ checkout, purchasing, returns and navigation are preserved.
 | OpenAPI endpoint coverage | All 66 generated controller operations documented |
 | Mermaid syntax | All seven diagrams parsed |
 | Database + image backup/restore | Passed, including corrupt/nonempty-target rejection |
-| Combined Docker image build/smoke | Blocked: Microsoft registry blob download returned `Forbidden`; no cached base images available |
+| Combined Docker image build/smoke | Local registry download was blocked, but the current GitHub Actions `container` job built and smoke-tested it successfully |
 
 PostgreSQL integration and browser
 workflows use disposable local databases, never the public demo database. SMTP tests use a local
@@ -51,13 +51,14 @@ Public demo links:
 - [OpenAPI JSON](https://possystem-1-26mq.onrender.com/swagger/v1/swagger.json)
 - [Database health endpoint](https://possystem-1-26mq.onrender.com/health)
 
-Remaining external checks: the Render deployment must finish successfully, GitHub's deploy hook
-secret and provider branch must match, and the actual public endpoints must pass health checks.
-The proxy restriction prevents this audit from establishing those facts; read-only GitHub Actions
-status requests were also blocked. The Dockerfile remains covered by the existing CI container
-job, but this audit could not run that job locally because base-image registry access was denied.
-Existing user-reported
-SMTP delivery is not a substitute for a new provider-side delivery check after deployment.
+Live verification completed on 2026-10-23. Render reported service `PosSystem-1` on
+`feature/release-readiness`, with Git auto-deploy disabled and the audited revision live. Public
+probes passed for `/health`, `/login`, and `/swagger/v1/swagger.json`. The matching GitHub push run
+passed `api`, `web`, `integration`, `e2e`, `backup-restore`, and `container` before its `deploy` job
+succeeded. The separate read-only diagnostics workflow also passed. Render's logs endpoint returned
+403 for the supplied API key, so raw production logs were not used as audit evidence. A production
+SMTP test message was manually confirmed received; recurring-job timing still depends on service
+uptime and provider configuration.
 
 Card/Online methods record references; this project does not settle payments through a gateway.
 Free-tier sleep can delay scheduled mail even though jobs persist in PostgreSQL. These existing
