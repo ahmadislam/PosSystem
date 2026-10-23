@@ -218,7 +218,7 @@ export class PosApi {
     paymentMethod: PaymentMethod,
     items: { productId: number; quantity: number; discountAmount: number }[],
     idempotencyKey: string,
-    options: { customerId: number | null; couponCode: string | null; loyaltyPointsToRedeem: number; cashTendered: number | null },
+    options: { customerId: number | null; couponCode: string | null; loyaltyPointsToRedeem: number; cashTendered: number | null; paymentProvider: string | null; paymentReference: string | null },
   ): Observable<SaleDto> {
     return this.http.post<SaleDto>(
       `${this.root}/api/sales`,

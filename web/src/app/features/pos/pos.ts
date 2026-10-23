@@ -28,6 +28,8 @@ export class Pos implements OnInit {
   categoryId: number | null = null;
   payment: PaymentMethod = 'Cash';
   cashTendered: number | null = null;
+  paymentProvider = '';
+  paymentReference = '';
   private checkoutFingerprint = '';
   private checkoutKey = '';
   readonly page = signal(1);
@@ -124,6 +126,12 @@ export class Pos implements OnInit {
     const total = totals.total;
     const payment = this.payment;
     const cashTendered = payment === 'Cash' ? this.cashTendered : null;
+    const paymentReference = payment === 'Cash' ? null : this.paymentReference.trim();
+    const paymentProvider = payment === 'Cash' ? null : this.paymentProvider.trim();
+    if (payment !== 'Cash' && !paymentReference) {
+      this.toast.show('Enter a payment reference for card or online payment.', 'warn');
+      return;
+    }
     if (payment === 'Cash' && (!Number.isFinite(cashTendered) || (cashTendered ?? -1) < total)) {
       this.toast.show('Cash tendered must be at least the sale total.', 'warn');
       return;
@@ -152,6 +160,8 @@ export class Pos implements OnInit {
         couponCode: this.couponCode.trim().toUpperCase() || null,
         loyaltyPointsToRedeem: this.loyaltyPointsToRedeem,
         cashTendered,
+        paymentProvider,
+        paymentReference,
       })
       .subscribe({
         next: (sale) => {
@@ -160,6 +170,8 @@ export class Pos implements OnInit {
           this.lastChangeDue.set(sale.changeDue);
           this.cart.clear();
           this.cashTendered = null;
+          this.paymentProvider = '';
+          this.paymentReference = '';
           this.couponCode = '';
           this.loyaltyPointsToRedeem = 0;
           this.lastSale.set(sale);

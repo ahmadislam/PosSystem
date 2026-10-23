@@ -90,6 +90,8 @@ describe('POS checkout and scanning', () => {
   it('does not send stale cash input for a card sale', () => {
     cart.add(product);
     pos.payment = 'Card';
+    pos.paymentProvider = 'Demo terminal';
+    pos.paymentReference = 'CARD-TEST-001';
     pos.cashTendered = 20;
     api.createSale.mockReturnValue(of({ ...sale, paymentMethod: 'Card', cashTendered: null, changeDue: null }));
     pos.checkout();

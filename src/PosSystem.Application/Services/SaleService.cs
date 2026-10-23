@@ -35,6 +35,10 @@ public class SaleService(
         }
         else if (request.CashTendered.HasValue)
             throw new BadRequestException("Cash tendered applies only to cash payments.");
+        if (request.PaymentMethod == PaymentMethod.Cash && (!string.IsNullOrWhiteSpace(request.PaymentProvider) || !string.IsNullOrWhiteSpace(request.PaymentReference)))
+            throw new BadRequestException("Payment provider and reference apply only to card or online payments.");
+        if (request.PaymentMethod != PaymentMethod.Cash && string.IsNullOrWhiteSpace(request.PaymentReference))
+            throw new BadRequestException("A payment reference is required for card and online payments.");
         if (request.LoyaltyPointsToRedeem < 0) throw new BadRequestException("Loyalty points to redeem cannot be negative.");
         if (!Guid.TryParse(idempotencyKey, out var parsedKey))
             throw new BadRequestException("A valid Idempotency-Key UUID header is required.");
@@ -139,6 +143,8 @@ public class SaleService(
                 {
                     CashierId = userId, ShiftId = shift.Id, SaleDate = DateTime.UtcNow,
                     PaymentMethod = request.PaymentMethod, Status = SaleStatus.Completed,
+                    PaymentProvider = request.PaymentProvider?.Trim(), PaymentReference = request.PaymentReference?.Trim(),
+                    PaymentStatus = request.PaymentMethod == PaymentMethod.Cash ? "Completed" : "Approved",
                     IdempotencyKey = idempotencyKey, RequestHash = requestHash,
                     CustomerId = customer?.Id, Customer = customer, CouponId = coupon?.Id, Coupon = coupon,
                     LoyaltyPointsRedeemed = request.LoyaltyPointsToRedeem
@@ -304,5 +310,6 @@ public class SaleService(
         s.TaxAmount, s.TotalAmount, s.PaymentMethod, s.Status,
         s.Items.Select(i => new SaleItemDto(i.Id, i.ProductId, i.Sku, i.ProductName, i.Quantity, i.UnitPrice,
         i.DiscountAmount, i.TaxAmount, i.LineTotal)).ToList(), s.CustomerId, s.Customer?.Name, s.Coupon?.Code,
-    s.LoyaltyPointsEarned, s.LoyaltyPointsRedeemed, s.CashTendered, s.ChangeDue);
+        s.LoyaltyPointsEarned, s.LoyaltyPointsRedeemed, s.CashTendered, s.ChangeDue,
+        s.PaymentProvider, s.PaymentReference, s.PaymentStatus);
 }

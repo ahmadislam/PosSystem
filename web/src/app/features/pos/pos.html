@@ -100,13 +100,28 @@
           [step]="loyaltyRules().redemptionPointsPerCurrencyUnit" [(ngModel)]="loyaltyPointsToRedeem" />
       </label>
     }
-    <label class="pay">Payment method recorded (no gateway collection)
+    <label class="pay">Payment method
       <select [(ngModel)]="payment">
         <option value="Cash">Cash</option>
         <option value="Card">Card</option>
         <option value="Online">Online</option>
       </select>
     </label>
+    @if (payment !== 'Cash') {
+      <label class="pay">Provider
+        <select [(ngModel)]="paymentProvider">
+          <option value="">Select provider</option>
+          <option value="Demo terminal">Demo terminal</option>
+          <option value="Demo online">Demo online</option>
+          <option value="Other">Other</option>
+        </select>
+      </label>
+      <label class="pay">{{ payment === 'Card' ? 'Authorization / last-four reference' : 'Online transaction reference' }}
+        <input [(ngModel)]="paymentReference" maxlength="120" autocomplete="off"
+          [placeholder]="payment === 'Card' ? 'CARD-DEMO-001' : 'ONLINE-DEMO-001'" />
+      </label>
+      <p class="muted payment-note">Demo mode records the provider reference; it does not charge a real card.</p>
+    }
     @if (payment === 'Cash') {
       <label class="pay">Cash tendered
         <input type="number" min="0" step="0.01" [(ngModel)]="cashTendered" />

@@ -232,6 +232,9 @@ export interface SaleDto {
   loyaltyPointsRedeemed: number;
   cashTendered: number | null;
   changeDue: number | null;
+  paymentProvider?: string | null;
+  paymentReference?: string | null;
+  paymentStatus?: string | null;
 }
 
 export interface SaleReturnItemDto {

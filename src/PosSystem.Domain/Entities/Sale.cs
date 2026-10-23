@@ -26,6 +26,9 @@ public class Sale : BaseEntity, ISoftDelete
     public decimal? CashTendered { get; set; }
     public decimal? ChangeDue { get; set; }
     public PaymentMethod PaymentMethod { get; set; }
+    public string? PaymentProvider { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? PaymentStatus { get; set; }
     public SaleStatus Status { get; set; } = SaleStatus.Completed;
     public bool IsDeleted { get; set; }
     public List<SaleItem> Items { get; set; } = new();
