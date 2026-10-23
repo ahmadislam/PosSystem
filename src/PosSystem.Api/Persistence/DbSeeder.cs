@@ -50,7 +50,7 @@ public static class DbSeeder
 
     private static async Task SeedDemoDataAsync(AppDbContext db)
     {
-        const string marker = "DemoDataSeededV2";
+        const string marker = "DemoDataSeededV3";
         if (await db.Settings.AnyAsync(s => s.SettingKey == marker)) return;
 
         var beverages = await db.Categories.FirstOrDefaultAsync(c => c.Name == "Beverages" && !c.IsDeleted);
@@ -110,6 +110,33 @@ public static class DbSeeder
         if (!await db.Coupons.AnyAsync(c => c.Code == "HALFPRICE"))
             db.Coupons.Add(new Coupon { Code = "HALFPRICE", Name = "Half price test", IsPercentage = true, Value = 50m, StartsAt = DateTime.UtcNow.AddMinutes(-5), EndsAt = DateTime.UtcNow.AddDays(7), MaxRedemptions = 10 });
         db.Settings.Add(new Setting { SettingKey = marker, Value = DateTime.UtcNow.ToString("O") });
+        await db.SaveChangesAsync();
+
+        await SeedDemoTransactionsAsync(db);
+    }
+
+    private static async Task SeedDemoTransactionsAsync(AppDbContext db)
+    {
+        var admin = await db.Users.OrderBy(u => u.Id).FirstAsync();
+        var products = await db.Products.Where(p => p.Sku == "COF-250" || p.Sku == "TEA-100" || p.Sku == "CHP-050" || p.Sku == "WAT-500").ToDictionaryAsync(p => p.Sku);
+        var customer = await db.Customers.FirstOrDefaultAsync(c => c.Email == "customer@example.test");
+        if (products.Count < 4 || await db.Sales.AnyAsync(s => s.InvoiceNumber.StartsWith("DEMO-"))) return;
+
+        for (var index = 0; index < 6; index++)
+        {
+            var saleDate = DateTime.UtcNow.Date.AddDays(-index).AddHours(10 + index);
+            var coffee = products["COF-250"];
+            var tea = products["TEA-100"];
+            var water = products["WAT-500"];
+            var coffeeLine = new SaleItem { ProductId = coffee.Id, Sku = coffee.Sku, ProductName = coffee.Name, Quantity = index % 2 + 1, UnitPrice = coffee.SalePrice, LineTotal = coffee.SalePrice * (index % 2 + 1) };
+            var teaLine = new SaleItem { ProductId = tea.Id, Sku = tea.Sku, ProductName = tea.Name, Quantity = 1, UnitPrice = tea.SalePrice, LineTotal = tea.SalePrice };
+            var waterLine = new SaleItem { ProductId = water.Id, Sku = water.Sku, ProductName = water.Name, Quantity = index % 3 + 1, UnitPrice = water.SalePrice, LineTotal = water.SalePrice * (index % 3 + 1) };
+            var subtotal = coffeeLine.LineTotal + teaLine.LineTotal + waterLine.LineTotal;
+            var shift = new CashierShift { CashierId = admin.Id, StartTime = saleDate.AddHours(-1), EndTime = saleDate.AddHours(1), OpeningCash = 100m, ExpectedCash = 100m + subtotal, ClosingCash = 100m + subtotal, CashVariance = 0m, Status = ShiftStatus.Closed };
+            var sale = new Sale { InvoiceNumber = $"DEMO-{index + 1:0000}", CashierId = admin.Id, Shift = shift, CustomerId = index % 2 == 0 ? customer?.Id : null, SaleDate = saleDate, Subtotal = subtotal, TotalAmount = subtotal, PaymentMethod = (index % 3) switch { 0 => PaymentMethod.Cash, 1 => PaymentMethod.Card, _ => PaymentMethod.Online }, CashTendered = index % 3 == 0 ? subtotal + 5m : null, ChangeDue = index % 3 == 0 ? 5m : null, Items = [coffeeLine, teaLine, waterLine] };
+            db.Sales.Add(sale);
+            db.AuditLogs.Add(new AuditLog { UserId = admin.Id, Timestamp = saleDate, Action = AuditAction.Create, EntityName = "Sale", EntityId = sale.InvoiceNumber, NewValues = "{\"source\":\"demo-seed\"}" });
+        }
         await db.SaveChangesAsync();
     }
 
