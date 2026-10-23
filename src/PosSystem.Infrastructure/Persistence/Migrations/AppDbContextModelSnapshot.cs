@@ -667,6 +667,15 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("integer");
 
+                    b.Property<string>("PaymentProvider")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PaymentReference")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PaymentStatus")
+                        .HasColumnType("text");
+
                     b.Property<string>("RequestHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");

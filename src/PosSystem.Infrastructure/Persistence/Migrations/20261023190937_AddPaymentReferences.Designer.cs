@@ -12,7 +12,7 @@ using PosSystem.Infrastructure.Persistence;
 namespace PosSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261023185248_AddPaymentReferences")]
+    [Migration("20261023190937_AddPaymentReferences")]
     partial class AddPaymentReferences
     {
         /// <inheritdoc />
@@ -669,6 +669,15 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("integer");
+
+                    b.Property<string>("PaymentProvider")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PaymentReference")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PaymentStatus")
+                        .HasColumnType("text");
 
                     b.Property<string>("RequestHash")
                         .HasMaxLength(64)
