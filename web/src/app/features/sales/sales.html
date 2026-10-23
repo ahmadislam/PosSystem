@@ -22,7 +22,7 @@
   <table>
     <thead>
       <tr>
-        <th>Invoice</th><th>When</th><th>Pay</th><th>Status</th><th class="n">Total</th><th></th>
+        <th>Invoice</th><th>When</th><th>Customer</th><th>Pay</th><th>Status</th><th class="n">Total</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -30,6 +30,7 @@
         <tr>
           <td class="mono">{{ s.invoiceNumber }}</td>
           <td>{{ s.saleDate | date:'short' }}</td>
+          <td>{{ s.customerName || 'Walk-in' }} @if (s.couponCode) { <small>· {{ s.couponCode }}</small> }</td>
           <td>{{ s.paymentMethod }}</td>
           <td>{{ s.status }}</td>
           <td class="n">{{ money(s.totalAmount) }}</td>
@@ -40,7 +41,7 @@
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="6" class="empty">No sales match this date range.</td></tr>
+        <tr><td colspan="7" class="empty">No sales match this date range.</td></tr>
       }
     </tbody>
   </table>

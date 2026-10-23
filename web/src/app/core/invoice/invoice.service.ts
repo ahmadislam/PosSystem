@@ -40,7 +40,16 @@ export class InvoiceService {
     doc.text(`Date: ${new Date(sale.saleDate).toLocaleString()}`, 14, y);
     y += 6;
     doc.text(`Payment recorded: ${sale.paymentMethod} (not a payment gateway receipt)`, 14, y);
-    y += 10;
+    y += 6;
+    if (sale.customerName) {
+      doc.text(`Customer: ${sale.customerName}`, 14, y);
+      y += 6;
+    }
+    if (sale.couponCode) {
+      doc.text(`Coupon: ${sale.couponCode}`, 14, y);
+      y += 6;
+    }
+    y += 4;
     doc.setFontSize(9);
     doc.text('SKU', 14, y);
     doc.text('Product', 42, y);

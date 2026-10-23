@@ -12,6 +12,12 @@ public class Sale : BaseEntity, ISoftDelete
     public User Cashier { get; set; } = null!;
     public int ShiftId { get; set; }
     public CashierShift Shift { get; set; } = null!;
+    public int? CustomerId { get; set; }
+    public Customer? Customer { get; set; }
+    public int? CouponId { get; set; }
+    public Coupon? Coupon { get; set; }
+    public int LoyaltyPointsEarned { get; set; }
+    public int LoyaltyPointsRedeemed { get; set; }
     public DateTime SaleDate { get; set; } = DateTime.UtcNow;
     public decimal Subtotal { get; set; }
     public decimal DiscountAmount { get; set; }

@@ -62,6 +62,58 @@
   }
 </section>
 
+<section class="panel">
+  <h2>Coupons</h2>
+  <form class="create-form" (ngSubmit)="createCoupon()">
+    <label>Code <input name="couponCode" required maxlength="40" [(ngModel)]="couponCode" /></label>
+    <label>Name <input name="couponName" required maxlength="200" [(ngModel)]="couponName" /></label>
+    <label>Discount type
+      <select name="couponType" [(ngModel)]="couponIsPercentage">
+        <option [ngValue]="false">Fixed amount</option><option [ngValue]="true">Percentage</option>
+      </select>
+    </label>
+    <label>{{ couponIsPercentage ? 'Percent' : 'Amount' }}
+      <input name="couponValue" type="number" min="0.01" [max]="couponIsPercentage ? 100 : 1000000000" step="0.01" required [(ngModel)]="couponValue" />
+    </label>
+    <label>Starts <input name="couponStarts" type="datetime-local" required [(ngModel)]="couponStartsAt" /></label>
+    <label>Ends <input name="couponEnds" type="datetime-local" required [(ngModel)]="couponEndsAt" /></label>
+    <button type="submit">Create coupon</button>
+  </form>
+  <p class="muted">Coupon discount is applied after item discounts and before loyalty redemption. Redemption is limited and dates use UTC.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Discount</th><th>Valid until (UTC)</th><th>Redemptions</th><th>Status</th></tr></thead>
+      <tbody>
+        @for (coupon of coupons(); track coupon.id) {
+          <tr><td>{{ coupon.code }}</td><td>{{ coupon.name }}</td><td>{{ coupon.isPercentage ? coupon.value + '%' : coupon.value }}</td>
+            <td>{{ coupon.endsAt | date:'short':'UTC' }}</td>
+            <td>{{ coupon.redemptionCount }}{{ coupon.maxRedemptions ? ' / ' + coupon.maxRedemptions : '' }}</td>
+            <td>
+              {{ coupon.isActive ? 'Active' : 'Inactive' }}
+              <button type="button" class="tiny" (click)="toggleCoupon(coupon)">
+                {{ coupon.isActive ? 'Deactivate' : 'Activate' }}
+              </button>
+            </td></tr>
+        } @empty { <tr><td colspan="6" class="empty">No coupons configured.</td></tr> }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Loyalty rules</h2>
+  <div class="create-form">
+    <label>Points earned per currency unit
+      <input type="number" min="1" max="1000" step="1" [(ngModel)]="loyaltyRules().earnPointsPerCurrencyUnit" />
+    </label>
+    <label>Points required per currency unit of redemption
+      <input type="number" min="1" max="10000" step="1" [(ngModel)]="loyaltyRules().redemptionPointsPerCurrencyUnit" />
+    </label>
+    <button type="button" (click)="saveLoyaltyRules()">Save loyalty rules</button>
+  </div>
+  <p class="muted">Points are earned on discounted pre-tax amounts. Redemption must be a multiple of the configured points-per-currency rate.</p>
+</section>
+
 @if (auth.role() === 'Admin') {
   <section class="panel">
     <h2>Staff accounts</h2>

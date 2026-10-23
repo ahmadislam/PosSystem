@@ -68,7 +68,40 @@ public class StockAdjustRequest
 }
 public record ProductDto(int Id, string Sku, string Name, string? Description, int CategoryId, string CategoryName,
     int? DefaultSupplierId, decimal CostPrice, decimal SalePrice, decimal TaxRate, int StockQuantity, int MinStockThreshold,
-    bool IsActive, bool IsLowStock);
+    bool IsActive, bool IsLowStock, string? PrimaryImageUrl = null);
+
+public class CustomerRequest
+{
+    [Required, StringLength(200, MinimumLength = 1)] public string Name { get; set; } = string.Empty;
+    [EmailAddress, StringLength(200)] public string? Email { get; set; }
+    [StringLength(50)] public string? Phone { get; set; }
+    [StringLength(500)] public string? Address { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+public record CustomerDto(int Id, string Name, string? Email, string? Phone, string? Address,
+    int LoyaltyPoints, bool IsActive);
+public record LoyaltyTransactionDto(int Id, DateTime CreatedAt, int PointsChange, int BalanceAfter,
+    string Type, string? Note);
+public record ProductImageDto(int Id, string ContentType, bool IsPrimary, string ImageUrl);
+public class CouponRequest
+{
+    [Required, StringLength(40, MinimumLength = 2)] public string Code { get; set; } = string.Empty;
+    [Required, StringLength(200, MinimumLength = 1)] public string Name { get; set; } = string.Empty;
+    public bool IsPercentage { get; set; }
+    [Range(0.01, 1000000000)] public decimal Value { get; set; }
+    public DateTime StartsAt { get; set; }
+    public DateTime EndsAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    [Range(1, 100000000)] public int? MaxRedemptions { get; set; }
+}
+public record CouponDto(int Id, string Code, string Name, bool IsPercentage, decimal Value,
+    DateTime StartsAt, DateTime EndsAt, bool IsActive, int? MaxRedemptions, int RedemptionCount);
+public class LoyaltyRulesRequest
+{
+    [Range(1, 1000)] public int EarnPointsPerCurrencyUnit { get; set; } = 1;
+    [Range(1, 10000)] public int RedemptionPointsPerCurrencyUnit { get; set; } = 100;
+}
+public record LoyaltyRulesDto(int EarnPointsPerCurrencyUnit, int RedemptionPointsPerCurrencyUnit);
 
 // ---- Suppliers ----
 public class SupplierRequest
@@ -118,13 +151,17 @@ public class SaleLineRequest
 public class CreateSaleRequest
 {
     public PaymentMethod PaymentMethod { get; set; }
+    [Range(1, int.MaxValue)] public int? CustomerId { get; set; }
+    [StringLength(40)] public string? CouponCode { get; set; }
+    [Range(0, 100000000)] public int LoyaltyPointsToRedeem { get; set; }
     [Required, MinLength(1)] public List<SaleLineRequest> Items { get; set; } = new();
 }
 public record SaleItemDto(int SaleItemId, int ProductId, string Sku, string ProductName, int Quantity, decimal UnitPrice,
     decimal DiscountAmount, decimal TaxAmount, decimal LineTotal);
 public record SaleDto(int Id, string InvoiceNumber, DateTime SaleDate, decimal Subtotal, decimal DiscountAmount,
     decimal TaxAmount, decimal TotalAmount, PaymentMethod PaymentMethod, SaleStatus Status,
-    IReadOnlyList<SaleItemDto> Items);
+    IReadOnlyList<SaleItemDto> Items, int? CustomerId = null, string? CustomerName = null, string? CouponCode = null,
+    int LoyaltyPointsEarned = 0, int LoyaltyPointsRedeemed = 0);
 
 public class SaleReturnLineRequest
 {

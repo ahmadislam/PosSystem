@@ -23,6 +23,10 @@ internal sealed class AuthTestDbContext(DbContextOptions<AuthTestDbContext> opti
     public DbSet<AuditLog> AuditLogs => throw new NotSupportedException();
     public DbSet<Setting> Settings => throw new NotSupportedException();
     public DbSet<LowStockAlert> LowStockAlerts => throw new NotSupportedException();
+    public DbSet<Customer> Customers => throw new NotSupportedException();
+    public DbSet<LoyaltyTransaction> LoyaltyTransactions => throw new NotSupportedException();
+    public DbSet<Coupon> Coupons => throw new NotSupportedException();
+    public DbSet<ProductImage> ProductImages => throw new NotSupportedException();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -21,4 +21,5 @@ public class Product : BaseEntity, ISoftDelete
     public uint RowVersion { get; set; }
     public bool IsActive { get; set; } = true;
     public bool IsDeleted { get; set; }
+    public List<ProductImage> Images { get; set; } = [];
 }

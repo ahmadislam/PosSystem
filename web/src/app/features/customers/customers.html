@@ -1,0 +1,54 @@
+<header class="head">
+  <div><h1>Customers</h1><p class="muted">Customer contact records and traceable loyalty balances.</p></div>
+  <button type="button" (click)="create()">New customer</button>
+</header>
+
+<div class="toolbar">
+  <input aria-label="Search customers" placeholder="Search name, email, or phone" [(ngModel)]="search" (keyup.enter)="load()" />
+  <button type="button" class="ghost" (click)="load()">Search</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Loyalty points</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      @for (customer of customers(); track customer.id) {
+        <tr>
+          <td>{{ customer.name }}</td><td>{{ customer.email || '—' }}</td><td>{{ customer.phone || '—' }}</td>
+          <td>{{ customer.loyaltyPoints }}</td><td>{{ customer.isActive ? 'Active' : 'Inactive' }}</td>
+          <td class="actions">
+            <button type="button" class="tiny" (click)="showLoyalty(customer)">Loyalty history</button>
+            <button type="button" class="tiny" (click)="edit(customer)">Edit</button>
+            <button type="button" class="tiny" (click)="remove(customer)">Archive</button>
+          </td>
+        </tr>
+      } @empty { <tr><td colspan="6" class="empty">No customers found.</td></tr> }
+    </tbody>
+  </table>
+</div>
+
+@if (formOpen) {
+  <div class="modal" (click)="formOpen = false">
+    <form class="card" (click)="$event.stopPropagation()" (ngSubmit)="save()">
+      <h2>{{ editingId() ? 'Edit customer' : 'New customer' }}</h2>
+      <label>Name <input name="name" required maxlength="200" [(ngModel)]="form.name" /></label>
+      <label>Email <input name="email" type="email" maxlength="200" [(ngModel)]="form.email" /></label>
+      <label>Phone <input name="phone" maxlength="50" [(ngModel)]="form.phone" /></label>
+      <label>Address <textarea name="address" maxlength="500" [(ngModel)]="form.address"></textarea></label>
+      <label><input name="isActive" type="checkbox" [(ngModel)]="form.isActive" /> Active</label>
+      <footer><button type="submit">Save customer</button><button type="button" class="ghost" (click)="formOpen = false">Cancel</button></footer>
+    </form>
+  </div>
+}
+
+@if (historyCustomer(); as customer) {
+  <div class="modal" (click)="closeHistory()">
+    <section class="card" (click)="$event.stopPropagation()">
+      <h2>{{ customer.name }} · {{ customer.loyaltyPoints }} points</h2>
+      @for (entry of loyaltyHistory(); track entry.id) {
+        <p>{{ entry.createdAt | date:'medium' }} · {{ entry.type }} · {{ entry.pointsChange > 0 ? '+' : '' }}{{ entry.pointsChange }} · balance {{ entry.balanceAfter }}</p>
+      } @empty { <p class="muted">No loyalty activity recorded.</p> }
+      <button type="button" class="ghost" (click)="closeHistory()">Close</button>
+    </section>
+  </div>
+}

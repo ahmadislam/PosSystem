@@ -31,6 +31,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/purchasing/purchasing').then((m) => m.Purchasing),
       },
       {
+        path: 'customers',
+        canActivate: [roleGuard('Admin', 'Manager')],
+        loadComponent: () => import('./features/customers/customers').then((m) => m.Customers),
+      },
+      {
         path: 'history',
         canActivate: [roleGuard('Admin', 'Manager')],
         loadComponent: () => import('./features/history/history').then((m) => m.History),

@@ -15,6 +15,9 @@ ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular point
 - Roles: Admin, Manager, Cashier; Admin-managed staff accounts, role changes, account disablement, and password resets
 - Categories, products (search, pagination), stock adjustments with a full stock movement history
 - Supplier contact management, optional product default suppliers, and purchase orders with Draft -> Ordered -> Received/Cancelled states; receiving stock, movement, and audit updates commit together
+- Customer contact records, optional sale association, configurable loyalty earning/redemption, and an auditable loyalty ledger with proportional return reversals
+- Manager-managed fixed/percentage coupons with UTC validity windows and redemption limits; coupons are applied after manual line discounts and before loyalty redemptions
+- Product image upload, primary image selection, catalog thumbnails, and image deletion; uploads accept PNG/JPEG/WebP up to 4 MB
 - Cashier shifts: Open -> PendingClose -> Closed, with cash variance
 - POS sales: transactional stock deduction, race-free invoice numbers, product concurrency protection (xmin), user-scoped idempotent checkout retries
 - Partial sale returns with proportional refunds, optional recorded return reasons, automatic restocking, and cash-refund shift reconciliation
@@ -123,6 +126,10 @@ erDiagram
   SUPPLIER ||--o{ PURCHASE_ORDER : supplies
   PURCHASE_ORDER ||--|{ PURCHASE_ORDER_ITEM : contains
   PRODUCT ||--o{ PURCHASE_ORDER_ITEM : ordered_as
+  CUSTOMER ||--o{ SALE : associated
+  COUPON ||--o{ SALE : applied
+  CUSTOMER ||--o{ LOYALTY_TRANSACTION : tracks
+  PRODUCT ||--o{ PRODUCT_IMAGE : displays
   PRODUCT ||--o{ LOW_STOCK_ALERT : tracks
   SALE ||--o{ SALE_RETURN : refunded_by
   CASHIER_SHIFT ||--o{ SALE_RETURN : records
@@ -199,6 +206,37 @@ erDiagram
     datetime ResolvedAt
     int DeliveryAttempts
   }
+  CUSTOMER {
+    int Id PK
+    string Name
+    string Email
+    int LoyaltyPoints
+    bool IsDeleted
+  }
+  COUPON {
+    int Id PK
+    string Code UK
+    bool IsPercentage
+    decimal Value
+    datetime StartsAt
+    datetime EndsAt
+    int RedemptionCount
+  }
+  LOYALTY_TRANSACTION {
+    int Id PK
+    int CustomerId FK
+    int SaleId FK
+    int SaleReturnId FK
+    int PointsChange
+    int BalanceAfter
+  }
+  PRODUCT_IMAGE {
+    int Id PK
+    int ProductId FK
+    string StorageKey
+    string ContentType
+    bool IsPrimary
+  }
   AUDIT_LOG {
     int Id PK
     int UserId FK
@@ -219,6 +257,10 @@ Interactive OpenAPI documentation is available at `/swagger` on a running API.
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` | Authenticated reads; Admin/Manager writes |
 | Products | `GET /api/products`, `/api/products/{id}`; `POST/PUT/DELETE /api/products`; `POST /api/products/{id}/adjust-stock` | Authenticated reads; Admin/Manager writes |
 | Suppliers and purchasing | `/api/suppliers`; `/api/purchase-orders` (create, edit draft, order, receive, cancel) | Admin/Manager |
+| Customers and loyalty | `/api/customers`, `/api/customers/{id}/loyalty` | Authenticated reads; Admin/Manager management |
+| Coupons and loyalty rules | `/api/coupons`, `/api/coupons/available`, `/api/coupons/loyalty-rules` | Authenticated availability; Admin/Manager management |
+| Product images | `/api/products/{id}/images` (list/upload), `PUT /api/products/{id}/images/{imageId}/primary`, `DELETE /api/products/{id}/images/{imageId}` | Admin/Manager |
+| Product image files | `GET /api/products/{id}/images/{imageId}` | Public catalog media |
 | Sales and returns | `GET/POST /api/sales`, `GET /api/sales/{id}`, `GET/POST /api/sales/{id}/returns` | Authenticated; cashier sales are scoped by service permissions |
 | Low-stock alerts | `GET /api/low-stock-alerts` | Admin/Manager |
 | Shifts | `GET /api/shifts/current`, `POST /api/shifts/open`, `/end`, `/close` | Authenticated |
@@ -242,11 +284,15 @@ database and signing in with a demo account, then place them under `docs/screens
 
 Do not include customer data, personal email addresses, credentials, or production secrets in screenshots.
 
-### Known feature gaps
+### Product image storage
 
-Customer records and sale association, loyalty balances/rewards, discount coupons, and persistent
-product-image management are not implemented in this release. They are intentionally not represented
-as active tables or screens; do not treat them as available capabilities.
+Image metadata is stored in PostgreSQL and image files are stored in the directory configured by
+`ProductImages__Directory`. The default is `App_Data/product-images` under the API content root.
+The files are deliberately served as public catalog media so browser image requests do not need to
+attach an access token; only upload and deletion require an Admin or Manager. Upload only images
+intended for public display. On hosts with ephemeral filesystems, attach persistent storage and set
+`ProductImages__Directory` to its mounted path, or uploaded files will not survive replacement of
+the container.
 
 ## Deploy and share
 

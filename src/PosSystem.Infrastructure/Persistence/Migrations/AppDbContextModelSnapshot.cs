@@ -153,6 +153,115 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("PosSystem.Domain.Entities.Coupon", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsPercentage")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxRedemptions")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("RedemptionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Coupons");
+                });
+
+            modelBuilder.Entity("PosSystem.Domain.Entities.Customer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("LoyaltyPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasFilter("\"Email\" IS NOT NULL AND \"IsDeleted\" = false");
+
+                    b.ToTable("Customers");
+                });
+
             modelBuilder.Entity("PosSystem.Domain.Entities.LowStockAlert", b =>
                 {
                     b.Property<int>("Id")
@@ -201,6 +310,59 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("SentAt", "NextAttemptAt");
 
                     b.ToTable("LowStockAlerts");
+                });
+
+            modelBuilder.Entity("PosSystem.Domain.Entities.LoyaltyTransaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BalanceAfter")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("PointsChange")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SaleId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SaleReturnId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId", "CreatedAt");
+
+                    b.HasIndex("SaleId", "Type")
+                        .IsUnique()
+                        .HasFilter("\"SaleId\" IS NOT NULL");
+
+                    b.HasIndex("SaleReturnId", "Type")
+                        .IsUnique()
+                        .HasFilter("\"SaleReturnId\" IS NOT NULL");
+
+                    b.ToTable("LoyaltyTransactions");
                 });
 
             modelBuilder.Entity("PosSystem.Domain.Entities.Product", b =>
@@ -277,6 +439,45 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                         .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("PosSystem.Domain.Entities.ProductImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "IsPrimary")
+                        .IsUnique()
+                        .HasFilter("\"IsPrimary\" = true");
+
+                    b.ToTable("ProductImages");
                 });
 
             modelBuilder.Entity("PosSystem.Domain.Entities.PurchaseOrder", b =>
@@ -410,8 +611,14 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                     b.Property<int>("CashierId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("CouponId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 2)
@@ -428,6 +635,12 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("LoyaltyPointsEarned")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LoyaltyPointsRedeemed")
+                        .HasColumnType("integer");
 
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("integer");
@@ -461,6 +674,10 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CouponId");
+
+                    b.HasIndex("CustomerId");
 
                     b.HasIndex("InvoiceNumber")
                         .IsUnique();
@@ -860,6 +1077,31 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("PosSystem.Domain.Entities.LoyaltyTransaction", b =>
+                {
+                    b.HasOne("PosSystem.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PosSystem.Domain.Entities.Sale", "Sale")
+                        .WithMany()
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PosSystem.Domain.Entities.SaleReturn", "SaleReturn")
+                        .WithMany()
+                        .HasForeignKey("SaleReturnId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Sale");
+
+                    b.Navigation("SaleReturn");
+                });
+
             modelBuilder.Entity("PosSystem.Domain.Entities.Product", b =>
                 {
                     b.HasOne("PosSystem.Domain.Entities.Category", "Category")
@@ -876,6 +1118,17 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Category");
 
                     b.Navigation("DefaultSupplier");
+                });
+
+            modelBuilder.Entity("PosSystem.Domain.Entities.ProductImage", b =>
+                {
+                    b.HasOne("PosSystem.Domain.Entities.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("PosSystem.Domain.Entities.PurchaseOrder", b =>
@@ -935,6 +1188,16 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("PosSystem.Domain.Entities.Coupon", "Coupon")
+                        .WithMany()
+                        .HasForeignKey("CouponId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PosSystem.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PosSystem.Domain.Entities.CashierShift", "Shift")
                         .WithMany()
                         .HasForeignKey("ShiftId")
@@ -942,6 +1205,10 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Cashier");
+
+                    b.Navigation("Coupon");
+
+                    b.Navigation("Customer");
 
                     b.Navigation("Shift");
                 });
@@ -1036,6 +1303,11 @@ namespace PosSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("PosSystem.Domain.Entities.Product", b =>
+                {
+                    b.Navigation("Images");
                 });
 
             modelBuilder.Entity("PosSystem.Domain.Entities.PurchaseOrder", b =>

@@ -4,7 +4,7 @@ import { PosApi } from '../../core/api/pos-api';
 import { CartStore } from '../../core/cart/cart.store';
 import { apiError } from '../../core/http/api-error';
 import { InvoiceService } from '../../core/invoice/invoice.service';
-import { CategoryDto, PaymentMethod, ProductDto, SaleDto, ShiftDto, lineTotals, money } from '../../core/models';
+import { CategoryDto, CouponDto, CustomerDto, LoyaltyRulesDto, PaymentMethod, ProductDto, SaleDto, ShiftDto, lineTotals, money } from '../../core/models';
 import { Toast } from '../../core/ui/toast';
 
 @Component({
@@ -32,6 +32,12 @@ export class Pos implements OnInit {
   readonly page = signal(1);
   readonly totalPages = signal(1);
   readonly categories = signal<CategoryDto[]>([]);
+  readonly customers = signal<CustomerDto[]>([]);
+  readonly coupons = signal<CouponDto[]>([]);
+  readonly loyaltyRules = signal<LoyaltyRulesDto>({ earnPointsPerCurrencyUnit: 1, redemptionPointsPerCurrencyUnit: 100 });
+  customerId: number | null = null;
+  couponCode = '';
+  loyaltyPointsToRedeem = 0;
   readonly products = signal<ProductDto[]>([]);
   readonly shift = signal<ShiftDto | null>(null);
   readonly busy = signal(false);
@@ -40,6 +46,9 @@ export class Pos implements OnInit {
 
   ngOnInit(): void {
     this.api.categories().subscribe({ next: (c) => this.categories.set(c) });
+    this.api.customers().subscribe({ next: (c) => this.customers.set(c.filter((customer) => customer.isActive)) });
+    this.api.coupons().subscribe({ next: (c) => this.coupons.set(c) });
+    this.api.loyaltyRules().subscribe({ next: (rules) => this.loyaltyRules.set(rules) });
     this.refreshShift();
     this.loadProducts();
   }
@@ -113,7 +122,8 @@ export class Pos implements OnInit {
       this.toast.show('Cart is empty.', 'warn');
       return;
     }
-    const total = this.cart.preview().total;
+    const totals = this.promotionPreview();
+    const total = totals.total;
     const payment = this.payment;
     const cashTendered = this.cashTendered;
     if (payment === 'Cash' && (!Number.isFinite(cashTendered) || (cashTendered ?? -1) < total)) {
@@ -122,6 +132,9 @@ export class Pos implements OnInit {
     }
     const payload = {
       payment: this.payment,
+      customerId: this.customerId,
+      couponCode: this.couponCode.trim().toUpperCase() || null,
+      loyaltyPointsToRedeem: this.loyaltyPointsToRedeem,
       items: lines.map((line) => ({
         productId: line.product.id,
         quantity: line.quantity,
@@ -135,7 +148,11 @@ export class Pos implements OnInit {
     }
     this.busy.set(true);
     this.api
-      .createSale(payment, payload.items, this.checkoutKey)
+      .createSale(payment, payload.items, this.checkoutKey, {
+        customerId: this.customerId,
+        couponCode: this.couponCode.trim().toUpperCase() || null,
+        loyaltyPointsToRedeem: this.loyaltyPointsToRedeem,
+      })
       .subscribe({
         next: (sale) => {
           this.checkoutFingerprint = '';
@@ -143,6 +160,8 @@ export class Pos implements OnInit {
           this.lastChangeDue.set(payment === 'Cash' ? Math.max(0, (cashTendered ?? 0) - total) : null);
           this.cart.clear();
           this.cashTendered = null;
+          this.couponCode = '';
+          this.loyaltyPointsToRedeem = 0;
           this.lastSale.set(sale);
           this.busy.set(false);
           this.toast.show(`Sale ${sale.invoiceNumber} recorded.`);
@@ -167,6 +186,43 @@ export class Pos implements OnInit {
 
   changeDue(): number {
     if (this.payment !== 'Cash' || !Number.isFinite(this.cashTendered)) return 0;
-    return Math.max(0, (this.cashTendered ?? 0) - this.cart.preview().total);
+    return Math.max(0, (this.cashTendered ?? 0) - this.promotionPreview().total);
+  }
+
+  promotionPreview(): { subtotal: number; discount: number; tax: number; total: number } {
+    const lines = this.cart.lines();
+    const base = lines.reduce((sum, line) =>
+      sum + Math.max(0, line.product.salePrice * line.quantity - line.discountAmount), 0);
+    const coupon = this.coupons().find((candidate) => candidate.code === this.couponCode.trim().toUpperCase());
+    const couponDiscount = !coupon ? 0 : coupon.isPercentage
+      ? Math.min(base, this.roundMoney(base * coupon.value / 100))
+      : Math.min(base, coupon.value);
+    const customer = this.customers().find((item) => item.id === this.customerId);
+    const rate = this.loyaltyRules().redemptionPointsPerCurrencyUnit;
+    const points = customer && this.loyaltyPointsToRedeem > 0 &&
+      this.loyaltyPointsToRedeem <= customer.loyaltyPoints && this.loyaltyPointsToRedeem % rate === 0
+      ? this.roundMoney(this.loyaltyPointsToRedeem / rate) : 0;
+    const loyaltyDiscount = Math.min(points, Math.max(0, base - couponDiscount));
+    const additionalDiscount = couponDiscount + loyaltyDiscount;
+    let allocated = 0;
+    const subtotal = lines.reduce((sum, line) => sum + line.product.salePrice * line.quantity, 0);
+    let discount = 0;
+    let tax = 0;
+    lines.forEach((line, index) => {
+      const eligible = Math.max(0, line.product.salePrice * line.quantity - line.discountAmount);
+      const extra = index === lines.length - 1
+        ? additionalDiscount - allocated
+        : base === 0 ? 0 : this.roundMoney(additionalDiscount * eligible / base);
+      allocated += extra;
+      discount += line.discountAmount + extra;
+      tax += lineTotals(line.product.salePrice, line.quantity, line.discountAmount + extra, line.product.taxRate).tax;
+    });
+    discount = this.roundMoney(discount);
+    tax = this.roundMoney(tax);
+    return { subtotal, discount, tax, total: this.roundMoney(subtotal - discount + tax) };
+  }
+
+  private roundMoney(amount: number): number {
+    return Math.round((amount + Number.EPSILON) * 100) / 100;
   }
 }

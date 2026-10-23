@@ -24,7 +24,8 @@ public class ProductService(IAppDbContext db, ICurrentUser current, ILowStockNot
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var query = db.Products.AsNoTracking().Include(p => p.Category).AsQueryable();
+        var query = db.Products.AsNoTracking().Include(p => p.Category)
+            .Include(p => p.Images.Where(i => i.IsPrimary)).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
@@ -40,7 +41,8 @@ public class ProductService(IAppDbContext db, ICurrentUser current, ILowStockNot
 
     public async Task<ProductDto> GetAsync(int id, CancellationToken ct = default)
     {
-        var product = await db.Products.AsNoTracking().Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id, ct)
+        var product = await db.Products.AsNoTracking().Include(p => p.Category)
+            .Include(p => p.Images.Where(i => i.IsPrimary)).FirstOrDefaultAsync(p => p.Id == id, ct)
             ?? throw new NotFoundException("Product not found.");
         return ToDto(product);
     }
@@ -69,8 +71,11 @@ public class ProductService(IAppDbContext db, ICurrentUser current, ILowStockNot
                 QuantityChange = request.StockQuantity, Note = "Initial stock"
             });
         }
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.SaveChangesAsync(ct);
         await lowStock.CheckAsync([product.Id], ct);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return await GetAsync(product.Id, ct);
     }
 
@@ -123,7 +128,8 @@ public class ProductService(IAppDbContext db, ICurrentUser current, ILowStockNot
 
     private static ProductDto ToDto(Product p) => new(p.Id, p.Sku, p.Name, p.Description, p.CategoryId, p.Category.Name,
         p.DefaultSupplierId, p.CostPrice, p.SalePrice, p.TaxRate, p.StockQuantity, p.MinStockThreshold, p.IsActive,
-        p.StockQuantity <= p.MinStockThreshold);
+        p.StockQuantity <= p.MinStockThreshold, p.Images.FirstOrDefault(i => i.IsPrimary) is { } image
+            ? $"/api/products/{p.Id}/images/{image.Id}" : null);
 
     private async Task ValidateDefaultSupplierAsync(int? supplierId, CancellationToken ct)
     {

@@ -4,15 +4,21 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   CategoryDto,
+  CouponDto,
+  CustomerDto,
+  CustomerRequest,
   AuditAction,
   AuditLogDto,
   BackgroundJobStatusDto,
   DashboardSummaryDto,
   EmailSettingsDto,
   LowStockAlertDto,
+  LoyaltyRulesDto,
+  LoyaltyTransactionDto,
   PagedResult,
   PaymentMethod,
   ProductDto,
+  ProductImageDto,
   ProductRequest,
   PurchaseOrderDto,
   PurchaseOrderLineRequest,
@@ -32,8 +38,77 @@ export class PosApi {
   private readonly http = inject(HttpClient);
   private readonly root = environment.apiUrl;
 
+  assetUrl(path: string): string {
+    if (!path.startsWith('/api/products/')) throw new Error('Invalid product image URL.');
+    return new URL(path, this.root || window.location.origin).toString();
+  }
+
   categories(): Observable<CategoryDto[]> {
     return this.http.get<CategoryDto[]>(`${this.root}/api/categories`);
+  }
+
+  customers(search?: string): Observable<CustomerDto[]> {
+    let params = new HttpParams();
+    if (search) params = params.set('search', search);
+    return this.http.get<CustomerDto[]>(`${this.root}/api/customers`, { params });
+  }
+
+  createCustomer(body: CustomerRequest): Observable<CustomerDto> {
+    return this.http.post<CustomerDto>(`${this.root}/api/customers`, body);
+  }
+
+  updateCustomer(id: number, body: CustomerRequest): Observable<CustomerDto> {
+    return this.http.put<CustomerDto>(`${this.root}/api/customers/${id}`, body);
+  }
+
+  deleteCustomer(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.root}/api/customers/${id}`);
+  }
+
+  customerLoyalty(id: number): Observable<LoyaltyTransactionDto[]> {
+    return this.http.get<LoyaltyTransactionDto[]>(`${this.root}/api/customers/${id}/loyalty`);
+  }
+
+  coupons(): Observable<CouponDto[]> {
+    return this.http.get<CouponDto[]>(`${this.root}/api/coupons/available`);
+  }
+
+  couponManagementList(): Observable<CouponDto[]> {
+    return this.http.get<CouponDto[]>(`${this.root}/api/coupons`);
+  }
+
+  createCoupon(coupon: Omit<CouponDto, 'id' | 'redemptionCount'>): Observable<CouponDto> {
+    return this.http.post<CouponDto>(`${this.root}/api/coupons`, coupon);
+  }
+
+  updateCoupon(id: number, coupon: Omit<CouponDto, 'id' | 'redemptionCount'>): Observable<CouponDto> {
+    return this.http.put<CouponDto>(`${this.root}/api/coupons/${id}`, coupon);
+  }
+
+  loyaltyRules(): Observable<LoyaltyRulesDto> {
+    return this.http.get<LoyaltyRulesDto>(`${this.root}/api/coupons/loyalty-rules`);
+  }
+
+  saveLoyaltyRules(rules: LoyaltyRulesDto): Observable<LoyaltyRulesDto> {
+    return this.http.put<LoyaltyRulesDto>(`${this.root}/api/coupons/loyalty-rules`, rules);
+  }
+
+  uploadProductImage(productId: number, file: File): Observable<unknown> {
+    const body = new FormData();
+    body.set('file', file);
+    return this.http.post(`${this.root}/api/products/${productId}/images`, body);
+  }
+
+  productImages(productId: number): Observable<ProductImageDto[]> {
+    return this.http.get<ProductImageDto[]>(`${this.root}/api/products/${productId}/images`);
+  }
+
+  setPrimaryProductImage(productId: number, imageId: number): Observable<void> {
+    return this.http.put<void>(`${this.root}/api/products/${productId}/images/${imageId}/primary`, {});
+  }
+
+  deleteProductImage(productId: number, imageId: number): Observable<void> {
+    return this.http.delete<void>(`${this.root}/api/products/${productId}/images/${imageId}`);
   }
 
   createCategory(name: string, description?: string): Observable<CategoryDto> {
@@ -139,10 +214,11 @@ export class PosApi {
     paymentMethod: PaymentMethod,
     items: { productId: number; quantity: number; discountAmount: number }[],
     idempotencyKey: string,
+    options: { customerId: number | null; couponCode: string | null; loyaltyPointsToRedeem: number },
   ): Observable<SaleDto> {
     return this.http.post<SaleDto>(
       `${this.root}/api/sales`,
-      { paymentMethod, items },
+      { paymentMethod, items, ...options },
       { headers: { 'Idempotency-Key': idempotencyKey } },
     );
   }

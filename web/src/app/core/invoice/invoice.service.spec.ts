@@ -11,6 +11,11 @@ const sale: SaleDto = {
   totalAmount: 19.35,
   paymentMethod: 'Cash',
   status: 'Completed',
+  customerId: null,
+  customerName: null,
+  couponCode: null,
+  loyaltyPointsEarned: 0,
+  loyaltyPointsRedeemed: 0,
   items: [{
     saleItemId: 1,
     productId: 1,

@@ -28,6 +28,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<LowStockAlert> LowStockAlerts => Set<LowStockAlert>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<LoyaltyTransaction> LoyaltyTransactions => Set<LoyaltyTransaction>();
+    public DbSet<Coupon> Coupons => Set<Coupon>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
     // Properties never written into the audit trail.
     private static readonly HashSet<string> AuditIgnored = ["PasswordHash", "RowVersion", "UpdatedAt", "CreatedAt"];
@@ -82,6 +86,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             e.HasIndex(p => p.Sku).IsUnique().HasFilter(NotDeleted);
             e.HasOne(p => p.Category).WithMany().HasForeignKey(p => p.CategoryId);
             e.HasOne(p => p.DefaultSupplier).WithMany().HasForeignKey(p => p.DefaultSupplierId);
+            e.HasMany(p => p.Images).WithOne(i => i.Product).HasForeignKey(i => i.ProductId);
         });
 
         b.Entity<StockMovement>(e =>
@@ -126,7 +131,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         b.Entity<PurchaseOrderItem>(e =>
         {
             e.HasIndex(i => i.PurchaseOrderId);
-            e.HasOne(i => i.Product).WithMany().HasForeignKey(i => i.ProductId);
         });
 
         b.Entity<SaleReturn>(e =>
@@ -160,6 +164,43 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             e.HasOne(alert => alert.Product).WithMany().HasForeignKey(alert => alert.ProductId);
             e.HasIndex(alert => alert.ProductId).IsUnique().HasFilter("\"ResolvedAt\" IS NULL");
             e.HasIndex(alert => new { alert.SentAt, alert.NextAttemptAt });
+        });
+        b.Entity<Customer>(e =>
+        {
+            e.Property(c => c.Name).HasMaxLength(200);
+            e.Property(c => c.Email).HasMaxLength(200);
+            e.Property(c => c.Phone).HasMaxLength(50);
+            e.Property(c => c.Address).HasMaxLength(500);
+            e.Property(c => c.RowVersion).IsRowVersion();
+            e.HasIndex(c => c.Email).IsUnique().HasFilter("\"Email\" IS NOT NULL AND \"IsDeleted\" = false");
+        });
+        b.Entity<LoyaltyTransaction>(e =>
+        {
+            e.Property(t => t.Type).HasMaxLength(30);
+            e.Property(t => t.Note).HasMaxLength(300);
+            e.HasIndex(t => new { t.CustomerId, t.CreatedAt });
+            e.HasIndex(t => new { t.SaleId, t.Type }).IsUnique().HasFilter("\"SaleId\" IS NOT NULL");
+            e.HasIndex(t => new { t.SaleReturnId, t.Type }).IsUnique().HasFilter("\"SaleReturnId\" IS NOT NULL");
+            e.HasOne(t => t.Customer).WithMany().HasForeignKey(t => t.CustomerId);
+            e.HasOne(t => t.Sale).WithMany().HasForeignKey(t => t.SaleId);
+            e.HasOne(t => t.SaleReturn).WithMany().HasForeignKey(t => t.SaleReturnId);
+        });
+        b.Entity<Coupon>(e =>
+        {
+            e.Property(c => c.Code).HasMaxLength(40);
+            e.Property(c => c.Name).HasMaxLength(200);
+            e.HasIndex(c => c.Code).IsUnique();
+        });
+        b.Entity<ProductImage>(e =>
+        {
+            e.Property(i => i.StorageKey).HasMaxLength(100);
+            e.Property(i => i.ContentType).HasMaxLength(50);
+            e.HasIndex(i => new { i.ProductId, i.IsPrimary }).IsUnique().HasFilter("\"IsPrimary\" = true");
+        });
+        b.Entity<Sale>(e =>
+        {
+            e.HasOne(s => s.Customer).WithMany().HasForeignKey(s => s.CustomerId);
+            e.HasOne(s => s.Coupon).WithMany().HasForeignKey(s => s.CouponId);
         });
 
         // Soft delete: hide IsDeleted rows from every query on entities implementing ISoftDelete.

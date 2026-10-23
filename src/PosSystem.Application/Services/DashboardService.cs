@@ -88,12 +88,14 @@ public class DashboardService(IAppDbContext db) : IDashboardService
             category.Id, category.Name, category.QuantitySold, category.Revenue)).ToList();
         var recentSales = await sales
             .Include(s => s.Items)
+            .Include(s => s.Customer)
+            .Include(s => s.Coupon)
             .OrderByDescending(s => s.SaleDate)
             .Take(8)
             .ToListAsync(ct);
 
         var lowStockQuery = db.Products.AsNoTracking()
-            .Include(p => p.Category)
+            .Include(p => p.Category).Include(p => p.Images.Where(i => i.IsPrimary))
             .Where(p => p.StockQuantity <= p.MinStockThreshold);
         var lowStockCount = await lowStockQuery.CountAsync(ct);
         var lowStockProducts = await lowStockQuery
@@ -121,11 +123,14 @@ public class DashboardService(IAppDbContext db) : IDashboardService
         sale.Id, sale.InvoiceNumber, sale.SaleDate, sale.Subtotal, sale.DiscountAmount,
         sale.TaxAmount, sale.TotalAmount, sale.PaymentMethod, sale.Status,
         sale.Items.Select(i => new SaleItemDto(i.Id, i.ProductId, i.Sku, i.ProductName, i.Quantity, i.UnitPrice,
-            i.DiscountAmount, i.TaxAmount, i.LineTotal)).ToList());
+            i.DiscountAmount, i.TaxAmount, i.LineTotal)).ToList(), sale.CustomerId, sale.Customer?.Name,
+        sale.Coupon?.Code, sale.LoyaltyPointsEarned, sale.LoyaltyPointsRedeemed);
 
     private static ProductDto ToProductDto(Product product) => new(
         product.Id, product.Sku, product.Name, product.Description, product.CategoryId, product.Category.Name,
         product.DefaultSupplierId,
         product.CostPrice, product.SalePrice, product.TaxRate, product.StockQuantity, product.MinStockThreshold,
-        product.IsActive, product.StockQuantity <= product.MinStockThreshold);
+        product.IsActive, product.StockQuantity <= product.MinStockThreshold,
+        product.Images.FirstOrDefault(image => image.IsPrimary) is { } image
+            ? $"/api/products/{product.Id}/images/{image.Id}" : null);
 }

@@ -22,6 +22,10 @@ public interface IAppDbContext
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<Setting> Settings { get; }
     DbSet<LowStockAlert> LowStockAlerts { get; }
+    DbSet<Customer> Customers { get; }
+    DbSet<LoyaltyTransaction> LoyaltyTransactions { get; }
+    DbSet<Coupon> Coupons { get; }
+    DbSet<ProductImage> ProductImages { get; }
     DatabaseFacade Database { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

@@ -37,7 +37,12 @@
       @for (p of products(); track p.id) {
         <tr [class.low]="p.isLowStock">
           <td class="mono">{{ p.sku }}</td>
-          <td>{{ p.name }}</td>
+          <td>
+            @if (p.primaryImageUrl) {
+              <img class="inventory-image" [src]="api.assetUrl(p.primaryImageUrl)" [alt]="p.name" loading="lazy" />
+            }
+            {{ p.name }}
+          </td>
           <td>{{ p.categoryName }}</td>
           <td class="n">{{ money(p.costPrice) }}</td>
           <td class="n">{{ money(p.salePrice) }}</td>
@@ -45,6 +50,7 @@
           <td class="acts">
             <button type="button" class="tiny" (click)="startEdit(p)">Edit</button>
             <button type="button" class="tiny" (click)="startAdjust(p)">Stock</button>
+            <button type="button" class="tiny" (click)="manageImages(p)">Images</button>
             <button type="button" class="tiny" (click)="remove(p)">Delete</button>
           </td>
         </tr>
@@ -112,5 +118,29 @@
         <button type="button" class="ghost" (click)="adjustId = null">Cancel</button>
       </div>
     </form>
+  </div>
+}
+
+@if (imageProduct(); as product) {
+  <div class="modal" (click)="closeImageManager()">
+    <section class="card image-manager" (click)="$event.stopPropagation()">
+      <h2>Images · {{ product.sku }}</h2>
+      <label class="image-upload">Upload PNG, JPEG, or WebP (max 4 MB); new uploads become primary
+        <input type="file" accept="image/png,image/jpeg,image/webp" (change)="uploadImage(product, $event)" />
+      </label>
+      <div class="image-list">
+        @for (image of productImages(); track image.id) {
+          <article>
+            <img [src]="api.assetUrl(image.imageUrl)" [alt]="product.name" />
+            <strong>{{ image.isPrimary ? 'Primary' : 'Additional image' }}</strong>
+            <button type="button" class="tiny" [disabled]="image.isPrimary" (click)="selectPrimaryImage(image)">Make primary</button>
+            <button type="button" class="tiny" (click)="removeImage(image)">Delete image</button>
+          </article>
+        } @empty {
+          <p class="muted">No images uploaded for this product.</p>
+        }
+      </div>
+      <div class="actions"><button type="button" class="ghost" (click)="closeImageManager()">Close</button></div>
+    </section>
   </div>
 }

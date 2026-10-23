@@ -16,6 +16,7 @@ const product: ProductDto = {
   minStockThreshold: 1,
   isActive: true,
   isLowStock: false,
+  primaryImageUrl: null,
 };
 
 describe('CartStore', () => {

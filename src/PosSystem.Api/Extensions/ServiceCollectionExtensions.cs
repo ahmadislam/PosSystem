@@ -39,6 +39,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<ISupplierService, SupplierService>();
+        services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<ICouponService, CouponService>();
+        services.AddScoped<ProductImageStorage>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
         services.AddScoped<IShiftService, ShiftService>();
