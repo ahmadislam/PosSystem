@@ -246,7 +246,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
                     EntityName = p.Entry.Metadata.ClrType.Name,
                     EntityId = ((BaseEntity)p.Entry.Entity).Id.ToString(),
                     OldValues = p.Old,
-                    NewValues = p.New
+                    // Added graphs may still have temporary foreign keys when CaptureAudit runs.
+                    // Read the snapshot after EF has propagated database-generated keys.
+                    NewValues = p.Action == AuditAction.Create
+                        ? JsonSerializer.Serialize(p.Entry.Properties
+                            .Where(property => !AuditIgnored.Contains(property.Metadata.Name) && !property.Metadata.IsPrimaryKey())
+                            .ToDictionary(property => property.Metadata.Name, property => property.CurrentValue))
+                        : p.New
                 });
             }
             await base.SaveChangesAsync(ct);
@@ -288,10 +294,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 
             if (entry.State == EntityState.Added)
             {
-                var values = entry.Properties
-                    .Where(p => !AuditIgnored.Contains(p.Metadata.Name) && !p.Metadata.IsPrimaryKey())
-                    .ToDictionary(p => p.Metadata.Name, p => p.CurrentValue);
-                list.Add(new PendingAudit(entry, AuditAction.Create, null, JsonSerializer.Serialize(values)));
+                list.Add(new PendingAudit(entry, AuditAction.Create, null, null));
             }
             else if (entry.State == EntityState.Modified)
             {

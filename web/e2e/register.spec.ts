@@ -57,7 +57,7 @@ async function productFixture(request: APIRequestContext, price = 10) {
 }
 
 async function scan(page: Page, sku: string) {
-  const scanner = page.getByRole('textbox', { name: 'Scan barcode or SKU' });
+  const scanner = page.getByRole('textbox', { name: 'Search products or scan a barcode' });
   await scanner.fill(sku.toLowerCase());
   await scanner.press('Enter');
   await expect(page.locator('.ticket li').filter({ hasText: sku.replace('SCAN-', '') })).toHaveCount(1);
@@ -104,12 +104,12 @@ test('inventory → scanner → cash checkout → PDF → return → close shift
   await page.getByRole('button', { name: 'Open shift', exact: true }).click();
   await expect(page.getByRole('button', { name: 'End shift', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Register', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Scan barcode or SKU' }).fill(sku.toLowerCase());
-  await page.getByRole('textbox', { name: 'Scan barcode or SKU' }).press('Enter');
+  await page.getByRole('textbox', { name: 'Search products or scan a barcode' }).fill(sku.toLowerCase());
+  await page.getByRole('textbox', { name: 'Search products or scan a barcode' }).press('Enter');
   await expect(page.locator('.ticket li').filter({ hasText: name })).toBeVisible();
   await page.getByLabel('Cash tendered', { exact: true }).fill('20');
   const checkoutResponse = page.waitForResponse(r => r.url().endsWith('/api/sales') && r.request().method() === 'POST');
-  await page.getByRole('button', { name: /Record sale/ }).click();
+  await page.getByRole('button', { name: /^Charge / }).click();
   const recordedSale = await (await checkoutResponse).json();
   await expect(page.getByRole('heading', { name: 'Sale complete' })).toBeVisible();
   await expect(page.locator('.modal')).toContainText('Change due: 10.00');
@@ -144,12 +144,12 @@ test('server rejects insufficient tender after price change and returns authorit
     await scan(page, product.sku);
     await client.put(`/api/products/${product.id}`, { ...body, salePrice: 12 });
     await page.getByLabel('Cash tendered', { exact: true }).fill('10');
-    await page.getByRole('button', { name: /Record sale/ }).click();
+    await page.getByRole('button', { name: /^Charge / }).click();
     await expect(page.locator('.toast.err')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Sale complete' })).not.toBeVisible();
     expect((await client.get(`/api/products/${product.id}`)).stockQuantity).toBe(10);
     await page.getByLabel('Cash tendered', { exact: true }).fill('20');
-    await page.getByRole('button', { name: /Record sale/ }).click();
+    await page.getByRole('button', { name: /^Charge / }).click();
     await expect(page.getByRole('heading', { name: 'Sale complete' })).toBeVisible();
     await expect(page.locator('.modal')).toContainText('12.00');
     await expect(page.locator('.modal')).toContainText('Change due: 8.00');
@@ -171,9 +171,9 @@ test('lost checkout response can be retried without a duplicate sale', async ({ 
       expect(committed.ok()).toBeTruthy();
       await route.abort('failed');
     }, { times: 1 });
-    await page.getByRole('button', { name: /Record sale/ }).click();
+    await page.getByRole('button', { name: /^Charge / }).click();
     await expect(page.locator('.toast.err')).toBeVisible();
-    await page.getByRole('button', { name: /Record sale/ }).click();
+    await page.getByRole('button', { name: /^Charge / }).click();
     await expect(page.getByRole('heading', { name: 'Sale complete' })).toBeVisible();
     expect((await client.get(`/api/products/${product.id}`)).stockQuantity).toBe(9);
     const sales = await client.get('/api/sales?pageSize=100');
@@ -192,9 +192,9 @@ test('cookie restores a browser session and sign-out clears the cart', async ({ 
     await expect(page.getByRole('heading', { name: 'Register', exact: true })).toBeVisible();
     await scan(page, product.sku);
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Sign in to the register' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
     await login(page);
-    await expect(page.getByText('Tap a product to add it.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Your cart is empty', { exact: true })).toBeVisible();
   } finally {
     await client.post('/api/shifts/end', {});
     await client.post('/api/shifts/close', { closingCash: 100 });

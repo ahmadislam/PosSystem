@@ -19,6 +19,7 @@ export default defineConfig({
       ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH }
       : {},
     screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
   },
   webServer: [
     {
@@ -31,6 +32,11 @@ export default defineConfig({
         ConnectionStrings__Default: process.env.POS_E2E_CONNECTION,
         Cors__Origins__0: 'http://localhost:4202',
         Email__Enabled: 'false',
+        Seed__AdminUsername: 'admin',
+        Seed__AdminEmail: 'admin@example.test',
+        Seed__AdminPassword: 'Admin@12345',
+        // Optional documentation capture uses this suite's disposable database only.
+        Seed__DemoData: process.env.POS_CAPTURE_DOCS === '1' ? 'true' : 'false',
       },
     },
     {

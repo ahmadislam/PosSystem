@@ -2,8 +2,21 @@
 
 ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular point-of-sale frontend.
 
+**Demo:** [Open Counter POS](https://possystem-1-26mq.onrender.com) ·
+**API:** [Swagger UI](https://possystem-1-26mq.onrender.com/swagger/index.html) ·
+[OpenAPI JSON](https://possystem-1-26mq.onrender.com/swagger/v1/swagger.json) ·
+[Health](https://possystem-1-26mq.onrender.com/health)
+
+This is the deployment URL supplied for the project. The audit environment's network proxy blocks
+access to that host; current public health and the deployed commit are not independently verified.
+Free Render instances may take time to wake up. Login accounts and secrets are not published.
+
+[Requirements audit](docs/requirements-audit.md) · [API reference](docs/api.md) ·
+[Architecture, full ERD, checkout and deployment diagrams](docs/architecture.md) ·
+[CI/CD setup](docs/ci-cd.md) · [Free demo deployment](docs/free-demo.md)
+
 ## Technology stack
-- **Frontend:** Angular 22, TypeScript, standalone components, RxJS, native CSS/SVG-style charts
+- **Frontend:** Angular 22, TypeScript, standalone components, RxJS, Chart.js dashboard charts with accessible tabular summaries
 - **Backend:** .NET 10, ASP.NET Core Web API, Clean Architecture, JWT access tokens and rotating HttpOnly refresh cookies
 - **Database:** PostgreSQL with EF Core migrations, global soft-delete filters, filtered indexes, and transaction/concurrency safeguards
 - **Background work and mail:** Hangfire PostgreSQL storage, MailKit SMTP, low-stock and daily/monthly sales email jobs
@@ -123,6 +136,10 @@ any sale. Each return must be processed during the user's open shift.
 ## Architecture
 `Domain` (entities, pricing rules) <- `Application` (services, DTOs, abstractions) <- `Infrastructure` (EF Core, JWT) <- `Api` (controllers, composition root).
 
+The [complete architecture document](docs/architecture.md) contains the system diagram, full ERD,
+checkout/payment sequence, dependency diagram, and deployment pipeline. The Render container hosts
+both the Angular client and API; PostgreSQL holds business data, images and durable Hangfire jobs.
+
 ```mermaid
 flowchart LR
   Browser[Angular 22 SPA] -->|HTTPS JSON / JWT| Api[ASP.NET Core 10 API]
@@ -147,12 +164,12 @@ erDiagram
   SALE ||--|{ SALE_ITEM : has
   CATEGORY ||--o{ PRODUCT : groups
   PRODUCT ||--o{ SALE_ITEM : sold_as
-  SUPPLIER ||--o{ PRODUCT : default_for
+  SUPPLIER o|--o{ PRODUCT : default_for
   SUPPLIER ||--o{ PURCHASE_ORDER : supplies
   PURCHASE_ORDER ||--|{ PURCHASE_ORDER_ITEM : contains
   PRODUCT ||--o{ PURCHASE_ORDER_ITEM : ordered_as
-  CUSTOMER ||--o{ SALE : associated
-  COUPON ||--o{ SALE : applied
+  CUSTOMER o|--o{ SALE : associated
+  COUPON o|--o{ SALE : applied
   CUSTOMER ||--o{ LOYALTY_TRANSACTION : tracks
   PRODUCT ||--o{ PRODUCT_IMAGE : displays
   PRODUCT ||--o{ LOW_STOCK_ALERT : tracks
@@ -162,7 +179,6 @@ erDiagram
   SALE_ITEM ||--o{ SALE_RETURN_ITEM : returned_from
   PRODUCT ||--o{ STOCK_MOVEMENT : tracks
   USER ||--o{ STOCK_MOVEMENT : performs
-  USER ||--o{ AUDIT_LOG : acts
 
   USER {
     int Id PK
@@ -175,17 +191,27 @@ erDiagram
   PRODUCT {
     int Id PK
     int CategoryId FK
+    int DefaultSupplierId FK
     string Sku UK
     int StockQuantity
+    int MinStockThreshold
+    bool IsDeleted
+  }
+  CATEGORY {
+    int Id PK
+    string Name UK
     bool IsDeleted
   }
   SALE {
     int Id PK
     int CashierId FK
     int ShiftId FK
+    int CustomerId FK
+    int CouponId FK
     string InvoiceNumber UK
     datetime SaleDate
     decimal TotalAmount
+    bool IsDeleted
   }
   SALE_ITEM {
     int Id PK
@@ -264,30 +290,38 @@ erDiagram
   }
   AUDIT_LOG {
     int Id PK
-    int UserId FK
+    int UserId "Logical actor id"
     datetime Timestamp
     string Action
     string EntityName
     string EntityId
+    jsonb OldValues
+    jsonb NewValues
   }
 ```
 
+Audit actor identifiers are retained as logical references, not enforced foreign keys. Only entities
+shown with `IsDeleted` use global soft-delete filters; financial/history ledgers are retained.
+
 ### API endpoint overview
 
-Interactive OpenAPI documentation is available at `/swagger` on a running API.
+Interactive OpenAPI documentation is available at `/swagger` on a running API. The
+[API reference](docs/api.md) lists every controller operation and explains auth, payloads, dates,
+report downloads and checkout idempotency.
 
 | Area | Endpoints | Access |
 |---|---|---|
 | Authentication | `POST /api/auth/login`, `/refresh`, `/logout`; `GET /api/auth/me` | Public login/refresh; authenticated identity |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` | Authenticated reads; Admin/Manager writes |
-| Products | `GET /api/products`, `/api/products/{id}`; `POST/PUT/DELETE /api/products`; `POST /api/products/{id}/adjust-stock` | Authenticated reads; Admin/Manager writes |
+| Products | `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}`, `GET /api/products/by-sku/{sku}`, `POST /api/products/{id}/adjust-stock` | Authenticated reads; Admin/Manager writes |
 | Suppliers and purchasing | `/api/suppliers`; `/api/purchase-orders` (create, edit draft, order, receive, cancel) | Admin/Manager |
 | Customers and loyalty | `/api/customers`, `/api/customers/{id}/loyalty` | Authenticated reads; Admin/Manager management |
 | Coupons and loyalty rules | `/api/coupons`, `/api/coupons/available`, `/api/coupons/loyalty-rules` | Authenticated availability; Admin/Manager management |
 | Product images | `/api/products/{id}/images` (list/upload), `PUT /api/products/{id}/images/{imageId}/primary`, `DELETE /api/products/{id}/images/{imageId}` | Admin/Manager |
 | Product image files | `GET /api/products/{id}/images/{imageId}` | Public catalog media |
 | Sales and returns | `GET/POST /api/sales`, `GET /api/sales/{id}`, `GET/POST /api/sales/{id}/returns` | Authenticated; cashier sales are scoped by service permissions |
-| Low-stock alerts | `GET /api/low-stock-alerts` | Admin/Manager |
+| Low-stock alerts | `GET /api/operations/low-stock-alerts` | Admin/Manager |
+| Background queue | `GET /api/operations/jobs` | Admin/Manager |
 | Shifts | `GET /api/shifts/current`, `POST /api/shifts/open`, `/end`, `/close` | Authenticated |
 | Dashboard | `GET /api/dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD` | Admin/Manager |
 | History | `GET /api/history/audit`, `/api/history/stock-movements` | Admin/Manager |
@@ -298,21 +332,21 @@ Interactive OpenAPI documentation is available at `/swagger` on a running API.
 
 ### Screenshots
 
-Repository screenshots are not included yet. Capture real, non-sensitive images after configuring the
-database and signing in with a demo account, then place them under `docs/screenshots/` and embed:
-
-```markdown
 ![Sales and inventory dashboard](docs/screenshots/dashboard.png)
 ![Point-of-sale register](docs/screenshots/pos.png)
 ![Print-ready invoice](docs/screenshots/invoice.png)
-```
 
-Do not include customer data, personal email addresses, credentials, or production secrets in screenshots.
+Captured from the running application with a disposable local PostgreSQL database and synthetic
+demo records. The invoice image is rendered from a PDF downloaded through the application.
+See [screenshot capture instructions](docs/screenshots/README.md) to reproduce them.
+[Download the sample invoice PDF](docs/screenshots/sample-invoice.pdf).
 
 ### Product image storage
 
-Image metadata is stored in PostgreSQL and image files are stored in the directory configured by
-`ProductImages__Directory`. The default is `App_Data/product-images` under the API content root.
+Image metadata is stored in PostgreSQL. The Render blueprint uses `ProductImages__Storage=Database`,
+which also stores the bytes in PostgreSQL; database backups include both. File-mode deployments
+store image bytes in `ProductImages__Directory` (default `App_Data/product-images` under the API
+content root) and must back up that directory along with the database.
 The files are deliberately served as public catalog media so browser image requests do not need to
 attach an access token; only upload and deletion require an Admin or Manager. Upload only images
 intended for public display. On hosts with ephemeral filesystems, attach persistent storage and set
@@ -321,9 +355,9 @@ the container.
 
 ## Deploy and share
 
-This repository is deployable, but it is not published until you create provider accounts and configure
-their project settings and secrets. Free-plan availability, sleep behavior, storage limits, and database
-retention change by provider; check the current plan details before using a demo database for real sales.
+The demo is configured for the Render link above. For a new deployment, follow the
+[single-service Render + Neon guide](docs/free-demo.md), or the separate API/frontend option below.
+Free-plan sleep behavior, storage quotas, and database retention depend on the hosting provider.
 
 ### 1. Create PostgreSQL
 
@@ -390,20 +424,23 @@ demonstrate the POS. The API and database must both remain available for the dem
 ### 4. CI-gated deploys
 
 GitHub Actions runs the .NET build/unit tests, Angular tests/production build, real PostgreSQL
-integration tests, Chromium browser workflows, and database/image backup-restore checks on pushes
-and pull requests targeting `main`. Integration tests create and delete their own databases;
+integration tests, Chromium browser workflows, database/image backup-restore checks, and a combined
+container smoke test on every branch push and pull requests targeting `main`.
+Integration tests create and delete their own databases;
 browser tests receive a separate disposable database. Local macOS Sass limitations do not affect
 the Linux build. Test result/trace artifacts are retained when appropriate.
 
 For an API deployment only after all readiness jobs pass, disable Render's automatic deploy and configure
 the repository Actions secret `RENDER_DEPLOY_HOOK`. For the frontend, disable Vercel's automatic Git
 deploy and configure a Vercel Deploy Hook as the repository Actions secret `VERCEL_DEPLOY_HOOK`.
-The deploy job runs only for a push to `main`, after API, web, integration, browser and restore jobs succeed. If a hook
+The deploy job runs only for a push to the repository variable `DEPLOY_BRANCH` (default:
+`feature/release-readiness`, matching `render.yaml`), after all six readiness jobs succeed. If a hook
 is absent, that hosting deploy is skipped; the deployment provider, API/database, SMTP, CORS, and
 secrets must still be separately configured. These repository files do not mean a provider account
 or live deployment exists.
 
-Deploy a clean baseline on the default branch first. Do not put database URLs, JWT keys, SMTP passwords,
+When changing deployment branches, update both `DEPLOY_BRANCH` and the provider/blueprint branch.
+See [CI/CD setup](docs/ci-cd.md). Do not put database URLs, JWT keys, SMTP passwords,
 or deploy hooks in committed files or screenshots.
 
 ### Database and product-image backup/restore

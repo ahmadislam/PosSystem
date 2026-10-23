@@ -51,41 +51,35 @@ public class DashboardService(IAppDbContext db) : IDashboardService
             .Select(g => new MonthlyRevenueDto(new DateTime(g.Year, g.Month, 1, 0, 0, 0, DateTimeKind.Utc), g.Revenue))
             .ToList();
 
-        var saleItems = from sale in sales
-                        join item in db.SaleItems.AsNoTracking() on sale.Id equals item.SaleId
-                        select item;
-        var topProductTotals = await saleItems
-            .GroupBy(item => new { item.Sku, item.ProductName })
-            .Select(group => new
-            {
-                group.Key.Sku,
-                group.Key.ProductName,
-                QuantitySold = group.Sum(item => item.Quantity),
-                Revenue = group.Sum(item => item.LineTotal)
-            })
-            .OrderByDescending(product => product.QuantitySold)
-            .ThenByDescending(product => product.Revenue)
-            .Take(5)
+        // Reporting aggregates stay in PostgreSQL rather than materializing sale lines in the API.
+        // SqlQuery parameterizes the UTC range; raw SQL must explicitly preserve the Sale soft-delete filter.
+        // Historical lines deliberately include retired products/categories, matching invoice snapshots.
+        var reportStart = DateTime.SpecifyKind(from?.Date ?? DateTime.MinValue, DateTimeKind.Utc);
+        var reportEnd = DateTime.SpecifyKind(to?.Date.AddDays(1) ?? DateTime.MaxValue, DateTimeKind.Utc);
+        var topSellingProducts = await db.Database.SqlQuery<TopSellingProductDto>($"""
+                SELECT i."Sku", i."ProductName", CAST(SUM(i."Quantity") AS integer) AS "QuantitySold",
+                       SUM(i."LineTotal") AS "Revenue"
+                FROM "Sales" AS s
+                INNER JOIN "SaleItems" AS i ON i."SaleId" = s."Id"
+                WHERE s."IsDeleted" = FALSE AND s."SaleDate" >= {reportStart} AND s."SaleDate" < {reportEnd}
+                GROUP BY i."Sku", i."ProductName"
+                ORDER BY "QuantitySold" DESC, "Revenue" DESC, i."Sku", i."ProductName"
+                LIMIT 5
+                """)
             .ToListAsync(ct);
-        var topSellingProducts = topProductTotals.Select(product => new TopSellingProductDto(
-            product.Sku, product.ProductName, product.QuantitySold, product.Revenue)).ToList();
 
-        var categoryTotals = await (
-                from item in saleItems
-                join product in db.Products.IgnoreQueryFilters().AsNoTracking() on item.ProductId equals product.Id
-                join category in db.Categories.IgnoreQueryFilters().AsNoTracking() on product.CategoryId equals category.Id
-                group item by new { category.Id, category.Name } into categoryGroup
-                orderby categoryGroup.Sum(item => item.LineTotal) descending
-                select new
-                {
-                    categoryGroup.Key.Id,
-                    categoryGroup.Key.Name,
-                    QuantitySold = categoryGroup.Sum(item => item.Quantity),
-                    Revenue = categoryGroup.Sum(item => item.LineTotal)
-                })
+        var salesByCategory = await db.Database.SqlQuery<CategorySalesDto>($"""
+                SELECT c."Id" AS "CategoryId", c."Name" AS "CategoryName",
+                       CAST(SUM(i."Quantity") AS integer) AS "QuantitySold", SUM(i."LineTotal") AS "Revenue"
+                FROM "Sales" AS s
+                INNER JOIN "SaleItems" AS i ON i."SaleId" = s."Id"
+                INNER JOIN "Products" AS p ON p."Id" = i."ProductId"
+                INNER JOIN "Categories" AS c ON c."Id" = p."CategoryId"
+                WHERE s."IsDeleted" = FALSE AND s."SaleDate" >= {reportStart} AND s."SaleDate" < {reportEnd}
+                GROUP BY c."Id", c."Name"
+                ORDER BY "Revenue" DESC, c."Id"
+                """)
             .ToListAsync(ct);
-        var salesByCategory = categoryTotals.Select(category => new CategorySalesDto(
-            category.Id, category.Name, category.QuantitySold, category.Revenue)).ToList();
         var recentSales = await sales
             .Include(s => s.Items)
             .Include(s => s.Customer)

@@ -57,8 +57,10 @@ while the service is asleep, so the demo disables email. This configuration is f
 demonstrations rather than daily shop operation. Free quotas and provider policies can change.
 
 Automatic deployment is disabled in the blueprint. GitHub Actions validates the branch;
-use Render's manual deploy after the checks pass. Optionally configure the existing Render
-deploy hook for the default branch after merging, and keep provider Git auto-deploy disabled.
+use Render's manual deploy after the checks pass, or configure `RENDER_DEPLOY_HOOK` for gated CD.
+The workflow defaults to `feature/release-readiness`, matching this blueprint; `DEPLOY_BRANCH`
+can select another deployment branch. Keep the provider branch and repository variable aligned
+and provider Git auto-deploy disabled. See [CI/CD setup](ci-cd.md).
 
 Database-mode images are included in database dumps. The existing database-and-image bundle
 scripts still support file-mode deployments. Export backups before changing or deleting projects.

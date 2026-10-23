@@ -10,15 +10,11 @@
 </div>
 
 <h2>Monthly gross sales</h2>
-<div class="chart monthly-chart" role="img" aria-label="Monthly revenue for the last 12 months">
-  @for (b of monthlyBars(); track b.label) {
-    <div class="col">
-      <div class="bar" [style.height.%]="b.pct" [title]="b.label + ': ' + money(b.value)"></div>
-      <span>{{ b.label }}</span>
-    </div>
-  } @empty {
-    <p class="muted">No monthly sales yet.</p>
-  }
+<div class="chart-panel">
+  <app-dashboard-chart [config]="monthlyChart()" description="Monthly gross sales for the last 12 months. Exact values follow in the monthly sales data table." />
+  <details class="chart-data"><summary>View monthly sales data</summary><div class="data-scroll"><table><caption class="sr-only">Monthly gross sales</caption><thead><tr><th scope="col">Month</th><th scope="col">Gross sales</th></tr></thead><tbody>
+    @for (b of monthlyBars(); track b.label) { <tr><th scope="row">{{ b.label }}</th><td>{{ money(b.value) }}</td></tr> }
+  </tbody></table></div></details>
 </div>
 
 <h2>Daily gross sales · last 7 days</h2>
@@ -34,8 +30,11 @@
 <div class="split">
   <section>
     <h2>Top-selling products · gross sales</h2>
+    @if (topProducts().length > 0) {
+      <div class="chart-panel"><app-dashboard-chart [config]="productsChart()" description="Gross sales for the top-selling products ranked by units sold. Exact sales values and quantities follow in the product list." /></div>
+    }
     <ul>
-      @for (product of topProducts(); track product.sku) {
+      @for (product of topProducts(); track product.sku + ':' + product.productName) {
         <li class="metric-row">
           <span class="mono">{{ product.sku }}</span>
           <span>{{ product.productName }} · {{ product.quantitySold }} sold</span>
@@ -48,6 +47,9 @@
   </section>
   <section>
     <h2>Sales by category · gross sales</h2>
+    @if (categoryBars().length > 0) {
+      <div class="chart-panel"><app-dashboard-chart [config]="categoriesChart()" description="Share of gross sales by product category. Exact sales values and quantities follow in the category list." /></div>
+    }
     <div class="category-chart">
       @for (category of categoryBars(); track category.label) {
         <div class="category-row">

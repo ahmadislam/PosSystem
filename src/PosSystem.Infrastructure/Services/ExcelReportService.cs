@@ -10,7 +10,9 @@ public sealed class ExcelReportService(AppDbContext db) : IExcelReportService
     public async Task<byte[]> CreateInventoryReportAsync(CancellationToken ct = default)
     {
         var products = await (
-                from product in db.Products.AsNoTracking()
+                // IgnoreQueryFilters on the historical category join applies to the whole query.
+                // Reapply the product filter explicitly so deleted stock is never exported.
+                from product in db.Products.AsNoTracking().Where(product => !product.IsDeleted)
                 join category in db.Categories.IgnoreQueryFilters().AsNoTracking()
                     on product.CategoryId equals category.Id
                 orderby category.Name, product.Name
