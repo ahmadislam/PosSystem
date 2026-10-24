@@ -43,7 +43,7 @@ public static class DbSeeder
                 {
                     Username = demoUsername,
                     Email = config["DemoAccess:Email"]?.Trim() ?? "portfolio-demo@example.invalid",
-                    Role = UserRole.Manager,
+                    Role = UserRole.Admin,
                     IsActive = true
                 };
                 var inaccessiblePassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
@@ -52,7 +52,7 @@ public static class DbSeeder
             }
             else
             {
-                demo.Role = UserRole.Manager;
+                demo.Role = UserRole.Admin;
                 demo.IsActive = true;
             }
         }

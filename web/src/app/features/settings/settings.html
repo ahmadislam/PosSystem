@@ -2,7 +2,7 @@
 <p class="muted">Manage staff access and configure the recipient for email reports and alerts.</p>
 
 @if (auth.isDemo()) {
-  <p class="demo-notice">Portfolio demo mode keeps private email and staff credentials protected. Operational features remain available.</p>
+  <p class="demo-notice">Portfolio demo mode shows the complete configuration. Administrative changes are read-only so every reviewer sees a stable demo.</p>
 }
 
 <section class="panel">
@@ -18,10 +18,10 @@
       <p class="muted">Configure SMTP host, port, sender, TLS, and credentials as server environment secrets; then set Email__Enabled=true and restart the API.</p>
     }
     <label>Manager email recipient
-      <input type="email" required maxlength="200" [(ngModel)]="managerEmail" placeholder="manager@example.com" [disabled]="auth.isDemo()" />
+      <input type="email" required maxlength="200" [(ngModel)]="managerEmail" placeholder="manager@example.com" />
     </label>
     <label class="checkbox">
-      <input type="checkbox" [(ngModel)]="alertsEnabled" [disabled]="auth.isDemo()" />
+      <input type="checkbox" [(ngModel)]="alertsEnabled" />
       Send low-stock alerts (requires SMTP to be enabled)
     </label>
     <div class="actions">
@@ -29,7 +29,7 @@
         {{ savingEmail() ? 'Saving…' : 'Save email settings' }}
       </button>
       @if (auth.role() === 'Admin') {
-        <button type="button" class="ghost" [disabled]="testingEmail() || !config.smtpEnabled || !managerEmail" (click)="sendTestEmail()">
+        <button type="button" class="ghost" [disabled]="testingEmail() || !config.smtpEnabled || !managerEmail || auth.isDemo()" (click)="sendTestEmail()">
           {{ testingEmail() ? 'Sending…' : 'Send test email' }}
         </button>
       }
@@ -81,7 +81,7 @@
     </label>
     <label>Starts <input name="couponStarts" type="datetime-local" required [(ngModel)]="couponStartsAt" /></label>
     <label>Ends <input name="couponEnds" type="datetime-local" required [(ngModel)]="couponEndsAt" /></label>
-    <button type="submit">Create coupon</button>
+    <button type="submit" [disabled]="auth.isDemo()">Create coupon</button>
   </form>
   <p class="muted">Coupon discount is applied after item discounts and before loyalty redemption. Redemption is limited and dates use UTC.</p>
   <div class="table-wrap">
@@ -94,7 +94,7 @@
             <td>{{ coupon.redemptionCount }}{{ coupon.maxRedemptions ? ' / ' + coupon.maxRedemptions : '' }}</td>
             <td>
               {{ coupon.isActive ? 'Active' : 'Inactive' }}
-              <button type="button" class="tiny" (click)="toggleCoupon(coupon)">
+              <button type="button" class="tiny" [disabled]="auth.isDemo()" (click)="toggleCoupon(coupon)">
                 {{ coupon.isActive ? 'Deactivate' : 'Activate' }}
               </button>
             </td></tr>
@@ -113,7 +113,7 @@
     <label>Points required per currency unit of redemption
       <input type="number" min="1" max="10000" step="1" [(ngModel)]="loyaltyRules().redemptionPointsPerCurrencyUnit" />
     </label>
-    <button type="button" (click)="saveLoyaltyRules()">Save loyalty rules</button>
+    <button type="button" [disabled]="auth.isDemo()" (click)="saveLoyaltyRules()">Save loyalty rules</button>
   </div>
   <p class="muted">Points are earned on discounted pre-tax amounts. Redemption must be a multiple of the configured points-per-currency rate.</p>
 </section>
@@ -132,7 +132,7 @@
           <option value="Admin">Admin</option>
         </select>
       </label>
-      <button type="submit">Create account</button>
+      <button type="submit" [disabled]="auth.isDemo()">Create account</button>
     </form>
     <p class="muted">Passwords require at least 12 characters. Passwords are hashed; existing passwords cannot be viewed. Role/status changes and password resets revoke refresh sessions; already-issued access tokens expire within the configured token lifetime.</p>
     <div class="table-wrap">
@@ -144,15 +144,15 @@
               <td>{{ user.username }}</td>
               <td>{{ user.email }}</td>
               <td>
-                <select [ngModel]="user.role" (ngModelChange)="updateStaff(user, $event, user.isActive)">
+                <select [ngModel]="user.role" [disabled]="auth.isDemo()" (ngModelChange)="updateStaff(user, $event, user.isActive)">
                   <option value="Cashier">Cashier</option><option value="Manager">Manager</option><option value="Admin">Admin</option>
                 </select>
               </td>
-              <td><label class="checkbox"><input type="checkbox" [ngModel]="user.isActive" (ngModelChange)="updateStaff(user, user.role, $event)" /> Active</label></td>
+              <td><label class="checkbox"><input type="checkbox" [ngModel]="user.isActive" [disabled]="auth.isDemo()" (ngModelChange)="updateStaff(user, user.role, $event)" /> Active</label></td>
               <td>{{ user.createdAt | date:'mediumDate' }}</td>
               <td class="password-cell">
                 <input type="password" [attr.aria-label]="'New password for ' + user.username" minlength="12" maxlength="128" [(ngModel)]="passwordDrafts[user.id]" placeholder="12+ characters" />
-                <button type="button" class="tiny" (click)="resetPassword(user)">Reset</button>
+                <button type="button" class="tiny" [disabled]="auth.isDemo()" (click)="resetPassword(user)">Reset</button>
               </td>
             </tr>
           } @empty {

@@ -9,7 +9,7 @@ using PosSystem.Domain.Entities;
 namespace PosSystem.Api.Controllers;
 
 [ApiController, Route("api/coupons"), Authorize]
-public sealed class CouponsController(ICouponService coupons, IAppDbContext db) : ControllerBase
+public sealed class CouponsController(ICouponService coupons, IAppDbContext db, DemoAccessSettings demoAccess) : ControllerBase
 {
     [HttpGet, Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<IReadOnlyList<CouponDto>>> List(CancellationToken ct) =>
@@ -22,13 +22,17 @@ public sealed class CouponsController(ICouponService coupons, IAppDbContext db) 
     [HttpPost, Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<CouponDto>> Create(CouponRequest request, CancellationToken ct)
     {
+        if (IsDemo()) return Forbid();
         var coupon = await coupons.CreateAsync(request, ct);
         return CreatedAtAction(nameof(List), new { id = coupon.Id }, coupon);
     }
 
     [HttpPut("{id:int}"), Authorize(Roles = "Admin,Manager")]
-    public async Task<ActionResult<CouponDto>> Update(int id, CouponRequest request, CancellationToken ct) =>
-        Ok(await coupons.UpdateAsync(id, request, ct));
+    public async Task<ActionResult<CouponDto>> Update(int id, CouponRequest request, CancellationToken ct)
+    {
+        if (IsDemo()) return Forbid();
+        return Ok(await coupons.UpdateAsync(id, request, ct));
+    }
 
     [HttpGet("loyalty-rules")]
     public async Task<ActionResult<LoyaltyRulesDto>> LoyaltyRules(CancellationToken ct)
@@ -43,6 +47,7 @@ public sealed class CouponsController(ICouponService coupons, IAppDbContext db) 
     [HttpPut("loyalty-rules"), Authorize(Roles = "Admin,Manager")]
     public async Task<ActionResult<LoyaltyRulesDto>> SaveLoyaltyRules(LoyaltyRulesRequest request, CancellationToken ct)
     {
+        if (IsDemo()) return Forbid();
         var values = await db.Settings.Where(setting =>
                 setting.SettingKey == "LoyaltyEarnPointsPerCurrency" ||
                 setting.SettingKey == "LoyaltyRedemptionPointsPerCurrency")
@@ -74,4 +79,9 @@ public sealed class CouponsController(ICouponService coupons, IAppDbContext db) 
             values.Add(key, created);
         }
     }
+
+    private bool IsDemo() => demoAccess.Enabled && string.Equals(
+        User.FindFirst("name")?.Value,
+        demoAccess.Username,
+        StringComparison.OrdinalIgnoreCase);
 }

@@ -74,6 +74,7 @@ export class Settings implements OnInit {
   }
 
   createStaff(): void {
+    if (this.demoLocked()) return;
     this.api.createStaff({
       username: this.username.trim(),
       email: this.staffEmail.trim(),
@@ -93,6 +94,7 @@ export class Settings implements OnInit {
   }
 
   updateStaff(user: StaffDto, role: UserRole, isActive: boolean): void {
+    if (this.demoLocked()) return;
     this.api.updateStaff(user.id, role, isActive).subscribe({
       next: (updated) => {
         this.staff.update((current) => current.map((entry) => entry.id === updated.id ? updated : entry));
@@ -106,6 +108,7 @@ export class Settings implements OnInit {
   }
 
   resetPassword(user: StaffDto): void {
+    if (this.demoLocked()) return;
     const password = this.passwordDrafts[user.id] ?? '';
     if (password.length < 12) {
       this.toast.show('Use a password with at least 12 characters.', 'warn');
@@ -132,6 +135,7 @@ export class Settings implements OnInit {
   }
 
   saveEmailSettings(): void {
+    if (this.demoLocked()) return;
     this.savingEmail.set(true);
     this.api.updateEmailSettings(this.managerEmail.trim(), this.alertsEnabled).subscribe({
       next: (settings) => {
@@ -148,6 +152,7 @@ export class Settings implements OnInit {
   }
 
   sendTestEmail(): void {
+    if (this.demoLocked()) return;
     this.testingEmail.set(true);
     this.api.testEmail().subscribe({
       next: ({ message }) => {
@@ -162,6 +167,7 @@ export class Settings implements OnInit {
   }
 
   createCoupon(): void {
+    if (this.demoLocked()) return;
     const request = {
       code: this.couponCode.trim().toUpperCase(),
       name: this.couponName.trim(),
@@ -185,6 +191,7 @@ export class Settings implements OnInit {
   }
 
   toggleCoupon(coupon: CouponDto): void {
+    if (this.demoLocked()) return;
     this.api.updateCoupon(coupon.id, {
       code: coupon.code,
       name: coupon.name,
@@ -204,6 +211,7 @@ export class Settings implements OnInit {
   }
 
   saveLoyaltyRules(): void {
+    if (this.demoLocked()) return;
     this.api.saveLoyaltyRules(this.loyaltyRules()).subscribe({
       next: (rules) => {
         this.loyaltyRules.set(rules);
@@ -216,5 +224,11 @@ export class Settings implements OnInit {
   private fail(error: unknown): void {
     this.loading.set(false);
     this.toast.show(apiError(error), 'err');
+  }
+
+  private demoLocked(): boolean {
+    if (!this.auth.isDemo()) return false;
+    this.toast.show('This administrative action is read-only in the public portfolio demo.', 'warn');
+    return true;
   }
 }

@@ -166,7 +166,7 @@ public class AuthSecurityTests
         {
             Username = "portfolio-demo",
             Email = "portfolio-demo@example.invalid",
-            Role = PosSystem.Domain.Enums.UserRole.Manager
+            Role = PosSystem.Domain.Enums.UserRole.Admin
         };
         demo.PasswordHash = hasher.HashPassword(demo, "an-inaccessible-random-demo-secret");
         db.Users.Add(demo);
@@ -182,7 +182,7 @@ public class AuthSecurityTests
         var login = await service.LoginDemoAsync("portfolio-demo");
 
         Assert.Equal("portfolio-demo", login.Response.Username);
-        Assert.Equal("Manager", login.Response.Role);
+        Assert.Equal("Admin", login.Response.Role);
         Assert.True(login.Response.IsDemo);
         Assert.NotEmpty(login.Response.AccessToken);
         Assert.NotEmpty(login.RefreshToken);

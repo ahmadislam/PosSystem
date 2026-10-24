@@ -42,9 +42,10 @@ Existing file-mode deployments keep their original file storage; this does not m
 
 ## 3. Sign in and check the demo
 
-Open the service URL and select **Explore live demo**. The server creates a dedicated Manager demo
+Open the service URL and select **Explore live demo**. The server creates a dedicated Admin demo
 account with an inaccessible random password, while the administrator password remains private.
-Use the administrator account only when you need to manage staff credentials.
+The public session can view the complete configuration, staff directory and audit history. Settings
+changes, staff-account changes and test-email delivery are read-only so the shared demo remains stable.
 
 Verify `/health` returns `Healthy`, then open a shift, record a sample sale, download its PDF,
 return an item, and close the shift. Upload a small product image and confirm it remains after

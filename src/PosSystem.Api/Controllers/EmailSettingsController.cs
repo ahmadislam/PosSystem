@@ -19,8 +19,6 @@ public sealed class EmailSettingsController(
     [HttpGet]
     public async Task<ActionResult<EmailSettingsDto>> Get(CancellationToken ct)
     {
-        if (IsDemo()) return Ok(new EmailSettingsDto(false, null, false));
-
         var values = await db.Settings.AsNoTracking()
             .Where(setting => setting.SettingKey == "ManagerEmail" || setting.SettingKey == "AlertsEnabled")
             .ToDictionaryAsync(setting => setting.SettingKey, setting => setting.Value, ct);

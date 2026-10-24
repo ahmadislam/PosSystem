@@ -19,8 +19,9 @@ For cross-origin frontend requests include credentials and configure exact CORS 
 combined Render deployment uses the same origin for client and API.
 
 When `DemoAccess:Enabled` is true, `POST /api/auth/demo` starts a session for the configured
-Manager demo account without accepting a username or password from the caller. It uses the same
-origin validation, JWT, refresh-cookie rotation, and authorization checks as staff login.
+Admin demo account without accepting a username or password from the caller. It uses the same
+origin validation, JWT, refresh-cookie rotation, and authorization checks as staff login. The demo
+can read administrative configuration, while email, coupon, loyalty and staff mutations return 403.
 
 Roles below: **Staff** = any authenticated Admin, Manager or Cashier; **Management** = Admin or
 Manager; **Admin** = Admin only. Cashiers can only read/return their own sales, and returns require
