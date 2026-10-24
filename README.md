@@ -432,18 +432,17 @@ browser tests receive a separate disposable database. Local macOS Sass limitatio
 the Linux build. Test result/trace artifacts are retained when appropriate.
 
 For an API deployment only after all readiness jobs pass, disable Render's automatic deploy and configure
-the repository Actions secret `RENDER_API_KEY`. The deploy step uses Render's fixed API origin to build
-the exact tested Git SHA, then waits until that revision is live. The optional `RENDER_SERVICE_ID`
-repository variable can override the documented demo service. For the frontend, disable Vercel's automatic Git
+the repository Actions secret `RENDER_DEPLOY_HOOK`. For the frontend, disable Vercel's automatic Git
 deploy and configure a Vercel Deploy Hook as the repository Actions secret `VERCEL_DEPLOY_HOOK`.
 The deploy job runs only for a push to the repository variable `DEPLOY_BRANCH` (default:
-`feature/release-readiness`, matching `render.yaml`), after all six readiness jobs succeed. A missing
-Render key fails the deployment job rather than producing a false green result. The deployment
-provider, API/database, SMTP, CORS, and secrets must still be separately configured.
+`feature/release-readiness`, matching `render.yaml`), after all six readiness jobs succeed. If a hook
+is absent, that hosting deploy is skipped; the deployment provider, API/database, SMTP, CORS, and
+secrets must still be separately configured. These repository files do not mean a provider account
+or live deployment exists.
 
 When changing deployment branches, update both `DEPLOY_BRANCH` and the provider/blueprint branch.
 See [CI/CD setup](docs/ci-cd.md). Do not put database URLs, JWT keys, SMTP passwords,
-or provider credentials in committed files or screenshots.
+or deploy hooks in committed files or screenshots.
 
 ### Database and product-image backup/restore
 

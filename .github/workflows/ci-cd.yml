@@ -175,32 +175,26 @@ jobs:
   deploy:
     needs: [api, web, integration, e2e, backup-restore, container]
     # Match render.yaml by default. Set DEPLOY_BRANCH when the hosting branch changes.
-    # Pull requests and pushes to other branches can test but cannot deploy production.
+    # Pull requests and pushes to other branches can test but cannot trigger deploy hooks.
     if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == (vars.DEPLOY_BRANCH || 'feature/release-readiness')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     concurrency:
       group: production-deploy
       cancel-in-progress: false
+    env:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Test Render deployment safeguards
-        run: python -m unittest discover -s tests/render-deploy -v
-      # Render Git auto-deploy is disabled. Deploy the exact SHA that passed every gate,
-      # then keep the workflow pending until Render reports that revision live.
-      - name: Deploy exact tested commit to Render
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID || 'srv-dbdoat6q1p3s739a67o0' }}
-          RENDER_COMMIT_SHA: ${{ github.sha }}
-          RENDER_EXPECTED_REPOSITORY: https://github.com/${{ github.repository }}
-          RENDER_EXPECTED_BRANCH: ${{ github.ref_name }}
-        run: python scripts/render-deploy.py
+      # Disable provider Git auto-deploy; these hooks run only after all readiness checks.
+      - name: Trigger Render deploy when configured
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK is not configured; skipping optional Render deployment."
+            printf '%s\n' 'Render: skipped; configure the RENDER_DEPLOY_HOOK repository secret to enable CI-gated deployment.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            curl --fail --silent --show-error --proto '=https' --tlsv1.2 --max-time 120 --output /dev/null -X POST "$RENDER_DEPLOY_HOOK"
+            printf '%s\n' 'Render: deploy requested after API, frontend, database integration, browser, backup/restore, and container checks passed. Confirm completion in Render Events.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Trigger Vercel deploy when configured
         env:
           VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
