@@ -10,13 +10,14 @@ public interface IProductService
 {
     Task<PagedResult<ProductDto>> SearchAsync(string? search, int? categoryId, bool lowStockOnly, int page, int pageSize, CancellationToken ct = default);
     Task<ProductDto> GetAsync(int id, CancellationToken ct = default);
+    Task<ProductDto> GetBySkuAsync(string sku, CancellationToken ct = default);
     Task<ProductDto> CreateAsync(ProductRequest request, CancellationToken ct = default);
     Task<ProductDto> UpdateAsync(int id, ProductRequest request, CancellationToken ct = default);
     Task<ProductDto> AdjustStockAsync(int id, StockAdjustRequest request, CancellationToken ct = default);
     Task DeleteAsync(int id, CancellationToken ct = default);
 }
 
-public class ProductService(IAppDbContext db, ICurrentUser current) : IProductService
+public class ProductService(IAppDbContext db, ICurrentUser current, ILowStockNotifier lowStock) : IProductService
 {
     public async Task<PagedResult<ProductDto>> SearchAsync(string? search, int? categoryId, bool lowStockOnly,
         int page, int pageSize, CancellationToken ct = default)
@@ -24,7 +25,8 @@ public class ProductService(IAppDbContext db, ICurrentUser current) : IProductSe
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var query = db.Products.AsNoTracking().Include(p => p.Category).AsQueryable();
+        var query = db.Products.AsNoTracking().Include(p => p.Category)
+            .Include(p => p.Images.Where(i => i.IsPrimary)).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
@@ -40,8 +42,22 @@ public class ProductService(IAppDbContext db, ICurrentUser current) : IProductSe
 
     public async Task<ProductDto> GetAsync(int id, CancellationToken ct = default)
     {
-        var product = await db.Products.AsNoTracking().Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id, ct)
+        var product = await db.Products.AsNoTracking().Include(p => p.Category)
+            .Include(p => p.Images.Where(i => i.IsPrimary)).FirstOrDefaultAsync(p => p.Id == id, ct)
             ?? throw new NotFoundException("Product not found.");
+        return ToDto(product);
+    }
+
+    public async Task<ProductDto> GetBySkuAsync(string sku, CancellationToken ct = default)
+    {
+        var normalized = sku.Trim().ToUpperInvariant();
+        if (normalized.Length is 0 or > 50)
+            throw new BadRequestException("SKU must contain between 1 and 50 characters.");
+
+        var product = await db.Products.AsNoTracking().Include(p => p.Category)
+            .Include(p => p.Images.Where(i => i.IsPrimary))
+            .SingleOrDefaultAsync(p => p.Sku == normalized && p.IsActive, ct)
+            ?? throw new NotFoundException("No active product has that SKU.");
         return ToDto(product);
     }
 
@@ -51,10 +67,12 @@ public class ProductService(IAppDbContext db, ICurrentUser current) : IProductSe
         var sku = request.Sku.Trim().ToUpperInvariant();
         if (await db.Products.AnyAsync(p => p.Sku == sku, ct)) throw new ConflictException($"SKU '{sku}' already exists.");
         if (!await db.Categories.AnyAsync(c => c.Id == request.CategoryId, ct)) throw new BadRequestException("Category does not exist.");
+        await ValidateDefaultSupplierAsync(request.DefaultSupplierId, ct);
 
         var product = new Product
         {
             Sku = sku, Name = request.Name.Trim(), Description = request.Description, CategoryId = request.CategoryId,
+            DefaultSupplierId = request.DefaultSupplierId,
             CostPrice = request.CostPrice, SalePrice = request.SalePrice, TaxRate = request.TaxRate,
             StockQuantity = request.StockQuantity, MinStockThreshold = request.MinStockThreshold, IsActive = request.IsActive
         };
@@ -67,7 +85,11 @@ public class ProductService(IAppDbContext db, ICurrentUser current) : IProductSe
                 QuantityChange = request.StockQuantity, Note = "Initial stock"
             });
         }
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await db.SaveChangesAsync(ct);
+        await lowStock.CheckAsync([product.Id], ct);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return await GetAsync(product.Id, ct);
     }
 
@@ -77,10 +99,13 @@ public class ProductService(IAppDbContext db, ICurrentUser current) : IProductSe
         var sku = request.Sku.Trim().ToUpperInvariant();
         if (await db.Products.AnyAsync(p => p.Sku == sku && p.Id != id, ct)) throw new ConflictException($"SKU '{sku}' already exists.");
         if (!await db.Categories.AnyAsync(c => c.Id == request.CategoryId, ct)) throw new BadRequestException("Category does not exist.");
+        await ValidateDefaultSupplierAsync(request.DefaultSupplierId, ct);
 
         product.Sku = sku; product.Name = request.Name.Trim(); product.Description = request.Description;
+        product.DefaultSupplierId = request.DefaultSupplierId;
         product.CategoryId = request.CategoryId; product.CostPrice = request.CostPrice; product.SalePrice = request.SalePrice;
         product.TaxRate = request.TaxRate; product.MinStockThreshold = request.MinStockThreshold; product.IsActive = request.IsActive;
+        await lowStock.CheckAsync([product.Id], ct);
         await db.SaveChangesAsync(ct);
         return await GetAsync(id, ct);
     }
@@ -99,6 +124,7 @@ public class ProductService(IAppDbContext db, ICurrentUser current) : IProductSe
             ProductId = product.Id, CreatedByUserId = userId, Type = StockMovementType.Adjustment,
             QuantityChange = request.QuantityChange, Note = request.Note
         });
+        await lowStock.CheckAsync([product.Id], ct);
         await db.SaveChangesAsync(ct);
         return await GetAsync(id, ct);
     }
@@ -106,11 +132,23 @@ public class ProductService(IAppDbContext db, ICurrentUser current) : IProductSe
     public async Task DeleteAsync(int id, CancellationToken ct = default)
     {
         var product = await db.Products.FirstOrDefaultAsync(p => p.Id == id, ct) ?? throw new NotFoundException("Product not found.");
+        var activeAlerts = await db.LowStockAlerts
+            .Where(alert => alert.ProductId == id && alert.ResolvedAt == null)
+            .ToListAsync(ct);
+        foreach (var alert in activeAlerts) alert.ResolvedAt = DateTime.UtcNow;
         db.Products.Remove(product);   // converted to a soft delete in AppDbContext
         await db.SaveChangesAsync(ct);
     }
 
     private static ProductDto ToDto(Product p) => new(p.Id, p.Sku, p.Name, p.Description, p.CategoryId, p.Category.Name,
-        p.CostPrice, p.SalePrice, p.TaxRate, p.StockQuantity, p.MinStockThreshold, p.IsActive,
-        p.StockQuantity <= p.MinStockThreshold);
+        p.DefaultSupplierId, p.CostPrice, p.SalePrice, p.TaxRate, p.StockQuantity, p.MinStockThreshold, p.IsActive,
+        p.StockQuantity <= p.MinStockThreshold, p.Images.FirstOrDefault(i => i.IsPrimary) is { } image
+            ? $"/api/products/{p.Id}/images/{image.Id}" : null);
+
+    private async Task ValidateDefaultSupplierAsync(int? supplierId, CancellationToken ct)
+    {
+        if (supplierId.HasValue &&
+            !await db.Suppliers.AnyAsync(s => s.Id == supplierId.Value && s.IsActive, ct))
+            throw new BadRequestException("Default supplier does not exist or is inactive.");
+    }
 }

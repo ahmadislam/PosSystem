@@ -21,9 +21,14 @@ services:
     depends_on:
       db: { condition: service_healthy }
     environment:
+      ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: "Host=db;Port=5432;Database=possystem;Username=postgres;Password=postgres"
       Jwt__Key: "local-dev-key-change-me-at-least-32-characters-long"
       Cors__Origins__0: "http://localhost:4200"
+      Seed__AdminUsername: admin
+      Seed__AdminEmail: admin@example.com
+      Seed__AdminPassword: Admin@12345
+      Email__Enabled: "false"
     ports: ["8080:10000"]
 
 volumes:

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { PosApi } from '../../core/api/pos-api';
 import { AuthService } from '../../core/auth/auth.service';
 import { apiError } from '../../core/http/api-error';
-import { EmailSettingsDto, StaffDto, UserRole } from '../../core/models';
+import { BackgroundJobStatusDto, CouponDto, EmailSettingsDto, LowStockAlertDto, LoyaltyRulesDto, StaffDto, UserRole } from '../../core/models';
 import { Toast } from '../../core/ui/toast';
 
 @Component({
@@ -19,6 +19,10 @@ export class Settings implements OnInit {
   readonly auth = inject(AuthService);
   readonly staff = signal<StaffDto[]>([]);
   readonly email = signal<EmailSettingsDto | null>(null);
+  readonly jobStatus = signal<BackgroundJobStatusDto | null>(null);
+  readonly lowStockAlerts = signal<LowStockAlertDto[]>([]);
+  readonly coupons = signal<CouponDto[]>([]);
+  readonly loyaltyRules = signal<LoyaltyRulesDto>({ earnPointsPerCurrencyUnit: 1, redemptionPointsPerCurrencyUnit: 100 });
   readonly loading = signal(false);
   readonly savingEmail = signal(false);
   readonly testingEmail = signal(false);
@@ -29,10 +33,32 @@ export class Settings implements OnInit {
   role: UserRole = 'Cashier';
   managerEmail = '';
   alertsEnabled = true;
+  couponCode = '';
+  couponName = '';
+  couponIsPercentage = false;
+  couponValue = 0;
+  couponStartsAt = new Date().toISOString().slice(0, 16);
+  couponEndsAt = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 16);
   readonly passwordDrafts: Record<number, string> = {};
 
   ngOnInit(): void {
     this.loadEmailSettings();
+    this.api.backgroundJobStatus().subscribe({
+      next: (status) => this.jobStatus.set(status),
+      error: (error) => this.fail(error),
+    });
+    this.api.lowStockAlerts().subscribe({
+      next: (alerts) => this.lowStockAlerts.set(alerts),
+      error: (error) => this.fail(error),
+    });
+    this.api.couponManagementList().subscribe({
+      next: (coupons) => this.coupons.set(coupons),
+      error: (error) => this.fail(error),
+    });
+    this.api.loyaltyRules().subscribe({
+      next: (rules) => this.loyaltyRules.set(rules),
+      error: (error) => this.fail(error),
+    });
     if (this.auth.role() === 'Admin') this.loadStaff();
   }
 
@@ -132,6 +158,58 @@ export class Settings implements OnInit {
         this.testingEmail.set(false);
         this.fail(error);
       },
+    });
+  }
+
+  createCoupon(): void {
+    const request = {
+      code: this.couponCode.trim().toUpperCase(),
+      name: this.couponName.trim(),
+      isPercentage: this.couponIsPercentage,
+      value: this.couponValue,
+      startsAt: new Date(this.couponStartsAt).toISOString(),
+      endsAt: new Date(this.couponEndsAt).toISOString(),
+      isActive: true,
+      maxRedemptions: null,
+    };
+    this.api.createCoupon(request).subscribe({
+      next: (coupon) => {
+        this.coupons.update((items) => [...items, coupon].sort((a, b) => a.code.localeCompare(b.code)));
+        this.couponCode = '';
+        this.couponName = '';
+        this.couponValue = 0;
+        this.toast.show(`Coupon ${coupon.code} created.`);
+      },
+      error: (error) => this.fail(error),
+    });
+  }
+
+  toggleCoupon(coupon: CouponDto): void {
+    this.api.updateCoupon(coupon.id, {
+      code: coupon.code,
+      name: coupon.name,
+      isPercentage: coupon.isPercentage,
+      value: coupon.value,
+      startsAt: coupon.startsAt,
+      endsAt: coupon.endsAt,
+      isActive: !coupon.isActive,
+      maxRedemptions: coupon.maxRedemptions,
+    }).subscribe({
+      next: (updated) => {
+        this.coupons.update((items) => items.map((item) => item.id === updated.id ? updated : item));
+        this.toast.show(`Coupon ${updated.code} ${updated.isActive ? 'activated' : 'deactivated'}.`);
+      },
+      error: (error) => this.fail(error),
+    });
+  }
+
+  saveLoyaltyRules(): void {
+    this.api.saveLoyaltyRules(this.loyaltyRules()).subscribe({
+      next: (rules) => {
+        this.loyaltyRules.set(rules);
+        this.toast.show('Loyalty rules saved.');
+      },
+      error: (error) => this.fail(error),
     });
   }
 

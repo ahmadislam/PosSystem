@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PosApi } from '../../core/api/pos-api';
 import { apiError } from '../../core/http/api-error';
-import { CategoryDto, ProductDto, ProductRequest, money } from '../../core/models';
+import { CategoryDto, ProductDto, ProductImageDto, ProductRequest, SupplierDto, money } from '../../core/models';
 import { Toast } from '../../core/ui/toast';
 
 const emptyForm = (): ProductRequest => ({
@@ -10,6 +10,7 @@ const emptyForm = (): ProductRequest => ({
   name: '',
   description: '',
   categoryId: 0,
+  defaultSupplierId: null,
   costPrice: 0,
   salePrice: 0,
   taxRate: 0,
@@ -25,14 +26,17 @@ const emptyForm = (): ProductRequest => ({
   styleUrl: './inventory.scss',
 })
 export class Inventory implements OnInit {
-  private readonly api = inject(PosApi);
+  readonly api = inject(PosApi);
   private readonly toast = inject(Toast);
 
   readonly money = money;
   search = '';
   lowStockOnly = false;
   readonly categories = signal<CategoryDto[]>([]);
+  readonly suppliers = signal<SupplierDto[]>([]);
   readonly products = signal<ProductDto[]>([]);
+  readonly imageProduct = signal<ProductDto | null>(null);
+  readonly productImages = signal<ProductImageDto[]>([]);
   readonly total = signal(0);
   readonly page = signal(1);
   readonly totalPages = signal(1);
@@ -47,6 +51,10 @@ export class Inventory implements OnInit {
 
   ngOnInit(): void {
     this.api.categories().subscribe({ next: (c) => this.categories.set(c) });
+    this.api.suppliers().subscribe({
+      next: (s) => this.suppliers.set(s.filter((supplier) => supplier.isActive)),
+      error: (e) => this.toast.show(apiError(e), 'err'),
+    });
     this.load();
   }
 
@@ -109,6 +117,7 @@ export class Inventory implements OnInit {
       name: p.name,
       description: p.description,
       categoryId: p.categoryId,
+      defaultSupplierId: p.defaultSupplierId,
       costPrice: p.costPrice,
       salePrice: p.salePrice,
       taxRate: p.taxRate,
@@ -166,6 +175,61 @@ export class Inventory implements OnInit {
     });
   }
 
+  uploadImage(product: ProductDto, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 4 * 1024 * 1024) {
+      this.toast.show('Choose a PNG, JPEG, or WebP image no larger than 4 MB.', 'warn');
+      return;
+    }
+    this.api.uploadProductImage(product.id, file).subscribe({
+      next: () => {
+        this.toast.show(`Image saved for ${product.sku}.`);
+        this.load();
+        if (this.imageProduct()?.id === product.id) this.loadProductImages(product.id);
+      },
+      error: (error) => this.toast.show(apiError(error), 'err'),
+    });
+  }
+
+  manageImages(product: ProductDto): void {
+    this.imageProduct.set(product);
+    this.loadProductImages(product.id);
+  }
+
+  selectPrimaryImage(image: ProductImageDto): void {
+    const product = this.imageProduct();
+    if (!product || image.isPrimary) return;
+    this.api.setPrimaryProductImage(product.id, image.id).subscribe({
+      next: () => {
+        this.toast.show('Primary product image updated.');
+        this.loadProductImages(product.id);
+        this.load();
+      },
+      error: (error) => this.toast.show(apiError(error), 'err'),
+    });
+  }
+
+  removeImage(image: ProductImageDto): void {
+    const product = this.imageProduct();
+    if (!product || !confirm(`Delete this image for ${product.sku}?`)) return;
+    this.api.deleteProductImage(product.id, image.id).subscribe({
+      next: () => {
+        this.toast.show('Product image deleted.');
+        this.loadProductImages(product.id);
+        this.load();
+      },
+      error: (error) => this.toast.show(apiError(error), 'err'),
+    });
+  }
+
+  closeImageManager(): void {
+    this.imageProduct.set(null);
+    this.productImages.set([]);
+  }
+
   downloadReport(): void {
     this.downloadingReport.set(true);
     this.api.inventoryReport().subscribe({
@@ -182,6 +246,13 @@ export class Inventory implements OnInit {
         this.downloadingReport.set(false);
         this.toast.show(apiError(error), 'err');
       },
+    });
+  }
+
+  private loadProductImages(productId: number): void {
+    this.api.productImages(productId).subscribe({
+      next: (images) => this.productImages.set(images),
+      error: (error) => this.toast.show(apiError(error), 'err'),
     });
   }
 }

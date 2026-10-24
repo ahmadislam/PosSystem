@@ -1,0 +1,146 @@
+<div class="head">
+  <div>
+    <h1>Suppliers &amp; purchasing</h1>
+    <p class="muted">Maintain supplier details and record deliveries into inventory.</p>
+  </div>
+  <div class="head-actions">
+    <button type="button" (click)="startSupplier()">New supplier</button>
+    <button type="button" [disabled]="!hasActiveSuppliers() || !products().length" (click)="startOrder()">New purchase order</button>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="section-head"><h2>Suppliers</h2><span class="muted">{{ activeSupplierCount() }} active</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Supplier</th><th>Contact</th><th>Email</th><th>Phone</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        @for (supplier of suppliers(); track supplier.id) {
+          <tr [class.inactive]="!supplier.isActive">
+            <td>{{ supplier.name }}</td>
+            <td>{{ supplier.contactName || '—' }}</td>
+            <td>{{ supplier.email || '—' }}</td>
+            <td>{{ supplier.phone || '—' }}</td>
+            <td>{{ supplier.isActive ? 'Active' : 'Inactive' }}</td>
+            <td class="acts">
+              <button type="button" class="tiny" (click)="editSupplier(supplier)">Edit</button>
+              <button type="button" class="tiny" [disabled]="!supplier.isActive" (click)="removeSupplier(supplier)">Delete</button>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="empty">No suppliers yet. Add one to start purchasing.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <div><h2>Purchase orders</h2><p class="muted">Draft → Ordered → Received, or cancel before receipt.</p></div>
+    <div class="filters">
+      <select [(ngModel)]="statusFilter" name="statusFilter" (change)="loadOrders()">
+        <option value="">All statuses</option>
+        <option value="Draft">Draft</option>
+        <option value="Ordered">Ordered</option>
+        <option value="Received">Received</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+      <button type="button" class="ghost" (click)="loadOrders()">Refresh</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>PO</th><th>Supplier</th><th>Created</th><th>Items</th><th class="n">Total cost</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        @for (order of orders(); track order.id) {
+          <tr>
+            <td class="mono">#{{ order.id }}</td>
+            <td>{{ order.supplierName }}</td>
+            <td>{{ order.createdAt | date:'mediumDate' }}</td>
+            <td class="item-list">
+              @for (item of order.items; track item.id) {
+                <span>{{ item.quantity }} × {{ item.productName }} <small>({{ money(item.unitCost) }} ea)</small></span>
+              }
+            </td>
+            <td class="n">{{ money(order.totalCost) }}</td>
+            <td><span [class]="'status ' + order.status.toLowerCase()">{{ order.status }}</span></td>
+            <td class="acts">
+              @if (order.status === 'Draft') {
+                <button type="button" class="tiny" (click)="editOrder(order)">Edit</button>
+                <button type="button" class="tiny" (click)="transition(order, 'order')">Order</button>
+              }
+              @if (order.status === 'Ordered') {
+                <button type="button" class="tiny receive" (click)="transition(order, 'receive')">Receive</button>
+              }
+              @if (order.status === 'Draft' || order.status === 'Ordered') {
+                <button type="button" class="tiny" (click)="transition(order, 'cancel')">Cancel</button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="empty">{{ loading() ? 'Loading purchase orders…' : 'No purchase orders match this filter.' }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+@if (supplierFormOpen) {
+  <div class="modal" (click)="supplierFormOpen = false">
+    <form class="card" (click)="$event.stopPropagation()" (ngSubmit)="saveSupplier()">
+      <h2>{{ editingSupplierId() ? 'Edit supplier' : 'New supplier' }}</h2>
+      <label>Name <input [(ngModel)]="supplierForm.name" name="supplierName" required maxlength="200" /></label>
+      <label>Contact name <input [(ngModel)]="supplierForm.contactName" name="contactName" maxlength="200" /></label>
+      <div class="pair">
+        <label>Email <input type="email" [(ngModel)]="supplierForm.email" name="email" maxlength="200" /></label>
+        <label>Phone <input [(ngModel)]="supplierForm.phone" name="phone" maxlength="50" /></label>
+      </div>
+      <label>Address <input [(ngModel)]="supplierForm.address" name="address" maxlength="500" /></label>
+      <label>Notes <textarea [(ngModel)]="supplierForm.notes" name="notes" maxlength="1000"></textarea></label>
+      <label class="check"><input type="checkbox" [(ngModel)]="supplierForm.isActive" name="supplierActive" /> Active</label>
+      <div class="actions">
+        <button type="submit">Save supplier</button>
+        <button type="button" class="ghost" (click)="supplierFormOpen = false">Cancel</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (orderFormOpen) {
+  <div class="modal" (click)="orderFormOpen = false">
+    <form class="card order-card" (click)="$event.stopPropagation()" (ngSubmit)="saveOrder()">
+      <h2>{{ editingOrderId() ? 'Edit draft purchase order' : 'New draft purchase order' }}</h2>
+      <label>Supplier
+        <select [(ngModel)]="supplierId" name="orderSupplier" required>
+          <option [ngValue]="0">Choose a supplier</option>
+          @for (supplier of suppliers(); track supplier.id) {
+            @if (supplier.isActive) { <option [ngValue]="supplier.id">{{ supplier.name }}</option> }
+          }
+        </select>
+      </label>
+      <div class="line-head"><strong>Products</strong><strong>Qty / unit cost</strong></div>
+      @for (line of lines; track $index; let i = $index) {
+        <div class="line">
+          <select [(ngModel)]="line.productId" [name]="'product-' + i" required>
+            <option [ngValue]="0">Choose a product</option>
+            @for (product of products(); track product.id) {
+              <option [ngValue]="product.id">{{ product.sku }} — {{ product.name }}</option>
+            }
+          </select>
+          <input type="number" [(ngModel)]="line.quantity" [name]="'quantity-' + i" min="1" step="1" required aria-label="Quantity" />
+          <input type="number" [(ngModel)]="line.unitCost" [name]="'cost-' + i" min="0" step="0.01" required aria-label="Unit cost" />
+          <button type="button" class="tiny" [disabled]="lines.length < 2" (click)="removeLine(i)" aria-label="Remove line">×</button>
+        </div>
+        @if (line.productId && productName(line.productId)) {
+          <small class="line-hint">{{ productName(line.productId) }} · line total {{ money(line.quantity * line.unitCost) }}</small>
+        }
+      }
+      <button type="button" class="ghost add-line" (click)="addLine()">Add product line</button>
+      <div class="actions">
+        <button type="submit">Save draft</button>
+        <button type="button" class="ghost" (click)="orderFormOpen = false">Cancel</button>
+      </div>
+    </form>
+  </div>
+}

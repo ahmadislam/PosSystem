@@ -24,28 +24,48 @@ public class AuthService(IAppDbContext db, ITokenService tokens, IPasswordHasher
             hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password) == PasswordVerificationResult.Failed)
             throw new UnauthorizedAppException("Invalid username or password.");
 
-        return await IssueAsync(user, null, ct);
+        var issued = await IssueAsync(user, ct);
+        return issued.Result;
     }
 
     public async Task<AuthResult> RefreshAsync(string refreshToken, CancellationToken ct = default)
     {
         var hash = tokens.HashToken(refreshToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var existing = await db.RefreshTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
         if (existing is null) throw new UnauthorizedAppException("Invalid refresh token.");
 
         if (existing.RevokedAt is not null)
         {
-            // A rotated token was presented again: assume it leaked and revoke every active token of this user.
-            var active = await db.RefreshTokens.Where(t => t.UserId == existing.UserId && t.RevokedAt == null).ToListAsync(ct);
-            foreach (var t in active) t.RevokedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
+            if (existing.ReplacedByTokenId is not null)
+            {
+                await RevokeActiveTokensAsync(existing.UserId, DateTime.UtcNow, ct);
+                await transaction.CommitAsync(ct);
+            }
             throw new UnauthorizedAppException("Refresh token was already used. Please sign in again.");
         }
 
         if (existing.ExpiresAt <= DateTime.UtcNow || !existing.User.IsActive)
             throw new UnauthorizedAppException("Refresh token expired.");
 
-        return await IssueAsync(existing.User, existing, ct);
+        var now = DateTime.UtcNow;
+        var claimed = await db.RefreshTokens
+            .Where(t => t.Id == existing.Id && t.RevokedAt == null && t.ExpiresAt > now)
+            .ExecuteUpdateAsync(update => update.SetProperty(t => t.RevokedAt, now), ct);
+
+        if (claimed != 1)
+        {
+            await RevokeActiveTokensAsync(existing.UserId, now, ct);
+            await transaction.CommitAsync(ct);
+            throw new UnauthorizedAppException("Refresh token was already used. Please sign in again.");
+        }
+
+        var issued = await IssueAsync(existing.User, ct);
+        await db.RefreshTokens
+            .Where(t => t.Id == existing.Id)
+            .ExecuteUpdateAsync(update => update.SetProperty(t => t.ReplacedByTokenId, (int?)issued.RefreshTokenId), ct);
+        await transaction.CommitAsync(ct);
+        return issued.Result;
     }
 
     public async Task LogoutAsync(string? refreshToken, CancellationToken ct = default)
@@ -58,7 +78,7 @@ public class AuthService(IAppDbContext db, ITokenService tokens, IPasswordHasher
         await db.SaveChangesAsync(ct);
     }
 
-    private async Task<AuthResult> IssueAsync(User user, RefreshToken? replaced, CancellationToken ct)
+    private async Task<(AuthResult Result, int RefreshTokenId)> IssueAsync(User user, CancellationToken ct)
     {
         var raw = tokens.GenerateRefreshToken();
         var entity = new RefreshToken
@@ -68,16 +88,16 @@ public class AuthService(IAppDbContext db, ITokenService tokens, IPasswordHasher
             ExpiresAt = DateTime.UtcNow.AddDays(jwt.RefreshTokenDays)
         };
         db.RefreshTokens.Add(entity);
-        if (replaced is not null) replaced.RevokedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        if (replaced is not null)
-        {
-            replaced.ReplacedByTokenId = entity.Id;
-            await db.SaveChangesAsync(ct);
-        }
-
         var access = tokens.CreateAccessToken(user, out var expires);
-        return new AuthResult(new AuthResponse(access, expires, user.Username, user.Role.ToString()), raw, entity.ExpiresAt);
+        return (
+            new AuthResult(new AuthResponse(access, expires, user.Username, user.Role.ToString()), raw, entity.ExpiresAt),
+            entity.Id);
     }
+
+    private Task<int> RevokeActiveTokensAsync(int userId, DateTime revokedAt, CancellationToken ct) =>
+        db.RefreshTokens
+            .Where(token => token.UserId == userId && token.RevokedAt == null)
+            .ExecuteUpdateAsync(update => update.SetProperty(token => token.RevokedAt, revokedAt), ct);
 }

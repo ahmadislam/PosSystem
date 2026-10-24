@@ -1,23 +1,35 @@
-<div class="wrap">
-  <form (ngSubmit)="submit()">
-    <p class="eyebrow">POS System</p>
-    <h1>Sign in to the register</h1>
-    <p class="hint">Access token stays in memory. The refresh token is an HttpOnly cookie.</p>
+<main class="login-shell">
+  @if (introVisible()) {
+    <div class="cinematic-intro" aria-hidden="true"><span class="intro-mark">⌁</span><strong>Counter</strong><small>POINT OF SALE</small></div>
+  }
+  <section class="brand-stage" aria-label="Counter point of sale">
+    <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div><div class="grid-lines"></div>
+    <div class="hero-copy"><div class="brand-lockup"><span class="rabbit" aria-hidden="true">C</span><span>Counter</span></div><span class="brand-kicker">POINT OF SALE</span><h2>Move your business<br /><em>forward.</em></h2><p>Fast checkout, clear inventory, and insight that keeps your team in control.</p><div class="hero-tags"><span>Sales</span><span>Inventory</span><span>Analytics</span></div></div>
+    <div class="hero-orb" aria-hidden="true"><div class="orb-core"></div><div class="orb-ring ring-one"></div><div class="orb-ring ring-two"></div><span class="orb-dot dot-one"></span><span class="orb-dot dot-two"></span></div>
+    <div class="floating-screen screen-front" aria-hidden="true"><div class="screen-top"><span class="mini-logo">C</span><span>Live register</span><b>●</b></div><div class="sale-row"><span>House Coffee</span><strong>$8.50</strong></div><div class="sale-row"><span>Chocolate Bar</span><strong>$1.25</strong></div><div class="sale-row muted-row"><span>Payment completed</span><strong>✓</strong></div></div>
+    <div class="activity-pill"><span class="pulse"></span> System online <b>24/7</b></div>
+  </section>
+  <section class="form-stage">
+  <form (ngSubmit)="submit()" class="login-card">
+    <div class="mobile-brand"><span class="rabbit" aria-hidden="true">C</span><span>Counter</span></div>
+    <p class="eyebrow">Staff portal</p>
+    <h1>Welcome back</h1>
+    <p class="hint">Sign in to manage sales, stock, and customers.</p>
 
     <label>
       Username
       <input name="username" [(ngModel)]="username" autocomplete="username" required />
     </label>
-    <label>
+    <label for="login-password">
       Password
-      <input name="password" [(ngModel)]="password" type="password" autocomplete="current-password" required />
     </label>
+    <span class="password-field"><input id="login-password" name="password" [(ngModel)]="password" [type]="showPassword ? 'text' : 'password'" autocomplete="current-password" required /><button type="button" class="visibility" (click)="showPassword = !showPassword" [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'">{{ showPassword ? 'Hide' : 'Show' }}</button></span>
 
     @if (error()) {
       <p class="err">{{ error() }}</p>
     }
 
-    <button type="submit" [disabled]="busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
-    <p class="seed">Default seed: admin / Admin@12345</p>
+    <button type="submit" class="submit" [disabled]="busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
+    <p class="secure-note"><span>●</span> Secure staff access · Your session is protected</p>
   </form>
-</div>
+</section></main>

@@ -2,9 +2,11 @@ name: CI-CD
 
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   api:
@@ -16,12 +18,13 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
-      - run: dotnet test --no-build -c Release
+      - run: dotnet test tests/PosSystem.Tests -c Release --no-build
 
   web:
     runs-on: ubuntu-latest
     env:
       NG_BUILD_SASS_EMBEDDED: 'false'
+      POS_API_ORIGIN: https://ci-api.example.invalid
     defaults:
       run:
         working-directory: web
@@ -36,18 +39,170 @@ jobs:
       - run: npm test -- --watch=false
       - run: npm run build
 
-  deploy:
-    needs: [api, web]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  integration:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      # Test-only server; every integration test owns a disposable pos_it_* database.
+      POS_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
+      POS_REQUIRE_POSTGRES_TESTS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test tests/PosSystem.IntegrationTests -c Release --no-build --logger "trx;LogFileName=integration.trx" --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-results
+          path: TestResults
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pos_e2e
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pos_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      POS_E2E_CONNECTION: Host=127.0.0.1;Port=5432;Database=pos_e2e;Username=postgres;Password=postgres
+      NG_BUILD_SASS_EMBEDDED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: dotnet build -c Release
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run e2e
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-results
+          path: |
+            web/playwright-report
+            web/test-results
+
+  backup-restore:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/test-backup-restore.sh
+        env:
+          PG_DOCKER_CONTAINER: ${{ job.services.postgres.id }}
+
+  container:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pos_container
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pos_container"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t possystem-demo:test .
+      - name: Start combined container against disposable database
+        run: >-
+          docker run --detach --name pos-demo --network host
+          --env ASPNETCORE_ENVIRONMENT=Development
+          --env 'ConnectionStrings__Default=Host=127.0.0.1;Port=5432;Database=pos_container;Username=postgres;Password=postgres'
+          --env ProductImages__Storage=Database
+          possystem-demo:test
+      - name: Check combined UI and API readiness
+        shell: python
+        run: |
+          import time, urllib.request, urllib.error
+          for attempt in range(90):
+              try:
+                  if urllib.request.urlopen('http://127.0.0.1:10000/health', timeout=3).read() == b'Healthy':
+                      break
+              except (OSError, urllib.error.URLError):
+                  pass
+              time.sleep(1)
+          else:
+              raise SystemExit('Container readiness failed')
+          html = urllib.request.urlopen('http://127.0.0.1:10000/pos').read()
+          assert b'<app-root' in html
+          config = urllib.request.urlopen('http://127.0.0.1:10000/runtime-config.js').read()
+          assert b'window.location.origin' in config
+      - run: docker logs pos-demo
+        if: failure()
+      - run: docker rm --force pos-demo
+        if: always()
+
+  deploy:
+    needs: [api, web, integration, e2e, backup-restore, container]
+    # Match render.yaml by default. Set DEPLOY_BRANCH when the hosting branch changes.
+    # Pull requests and pushes to other branches can test but cannot trigger deploy hooks.
+    if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == (vars.DEPLOY_BRANCH || 'feature/release-readiness')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     env:
       RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
     steps:
-      # Render: turn OFF auto-deploy for the service and use its Deploy Hook so only tested code ships.
+      # Disable provider Git auto-deploy; these hooks run only after all readiness checks.
       - name: Trigger Render deploy when configured
         run: |
           if [ -z "$RENDER_DEPLOY_HOOK" ]; then
             echo "RENDER_DEPLOY_HOOK is not configured; skipping optional Render deployment."
+            printf '%s\n' 'Render: skipped; configure the RENDER_DEPLOY_HOOK repository secret to enable CI-gated deployment.' >> "$GITHUB_STEP_SUMMARY"
           else
-            curl --fail --silent --show-error -X POST "$RENDER_DEPLOY_HOOK"
+            curl --fail --silent --show-error --proto '=https' --tlsv1.2 --max-time 120 --output /dev/null -X POST "$RENDER_DEPLOY_HOOK"
+            printf '%s\n' 'Render: deploy requested after API, frontend, database integration, browser, backup/restore, and container checks passed. Confirm completion in Render Events.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Trigger Vercel deploy when configured
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK is not configured; skipping optional Vercel deployment."
+            printf '%s\n' 'Vercel: skipped; a separate frontend deployment is optional for the combined Render container.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            curl --fail --silent --show-error --proto '=https' --tlsv1.2 --max-time 120 --output /dev/null -X POST "$VERCEL_DEPLOY_HOOK"
+            printf '%s\n' 'Vercel: deploy requested after all readiness checks passed. Confirm completion in Vercel Deployments.' >> "$GITHUB_STEP_SUMMARY"
           fi

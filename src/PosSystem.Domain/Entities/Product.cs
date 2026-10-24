@@ -6,6 +6,8 @@ public class Product : BaseEntity, ISoftDelete
 {
     public int CategoryId { get; set; }
     public Category Category { get; set; } = null!;
+    public int? DefaultSupplierId { get; set; }
+    public Supplier? DefaultSupplier { get; set; }
     public string Sku { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
@@ -19,4 +21,5 @@ public class Product : BaseEntity, ISoftDelete
     public uint RowVersion { get; set; }
     public bool IsActive { get; set; } = true;
     public bool IsDeleted { get; set; }
+    public List<ProductImage> Images { get; set; } = [];
 }

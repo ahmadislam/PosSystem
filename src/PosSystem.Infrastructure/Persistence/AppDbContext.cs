@@ -15,7 +15,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
     public DbSet<Sale> Sales => Set<Sale>();
@@ -24,6 +27,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<LowStockAlert> LowStockAlerts => Set<LowStockAlert>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<LoyaltyTransaction> LoyaltyTransactions => Set<LoyaltyTransaction>();
+    public DbSet<Coupon> Coupons => Set<Coupon>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductImageContent> ProductImageContents => Set<ProductImageContent>();
 
     // Properties never written into the audit trail.
     private static readonly HashSet<string> AuditIgnored = ["PasswordHash", "RowVersion", "UpdatedAt", "CreatedAt"];
@@ -59,6 +68,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             e.HasIndex(c => c.Name).IsUnique().HasFilter(NotDeleted);
         });
 
+        b.Entity<Supplier>(e =>
+        {
+            e.Property(s => s.Name).HasMaxLength(200);
+            e.Property(s => s.ContactName).HasMaxLength(200);
+            e.Property(s => s.Email).HasMaxLength(200);
+            e.Property(s => s.Phone).HasMaxLength(50);
+            e.Property(s => s.Address).HasMaxLength(500);
+            e.Property(s => s.Notes).HasMaxLength(1000);
+            e.HasIndex(s => s.Name).IsUnique().HasFilter(NotDeleted);
+        });
+
         b.Entity<Product>(e =>
         {
             e.Property(p => p.Sku).HasMaxLength(50);
@@ -66,6 +86,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             e.Property(p => p.RowVersion).IsRowVersion();   // uint -> PostgreSQL xmin
             e.HasIndex(p => p.Sku).IsUnique().HasFilter(NotDeleted);
             e.HasOne(p => p.Category).WithMany().HasForeignKey(p => p.CategoryId);
+            e.HasOne(p => p.DefaultSupplier).WithMany().HasForeignKey(p => p.DefaultSupplierId);
+            e.HasMany(p => p.Images).WithOne(i => i.Product).HasForeignKey(i => i.ProductId);
         });
 
         b.Entity<StockMovement>(e =>
@@ -87,6 +109,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             e.Property(s => s.InvoiceNumber).HasMaxLength(30);
             e.HasIndex(s => s.InvoiceNumber).IsUnique();
             e.HasIndex(s => s.SaleDate);
+            e.HasIndex(s => new { s.CashierId, s.IdempotencyKey })
+                .IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+            e.Property(s => s.IdempotencyKey).HasMaxLength(32);
+            e.Property(s => s.RequestHash).HasMaxLength(64);
             e.HasOne(s => s.Cashier).WithMany().HasForeignKey(s => s.CashierId);
             e.HasOne(s => s.Shift).WithMany().HasForeignKey(s => s.ShiftId);
             e.HasMany(s => s.Items).WithOne(i => i.Sale).HasForeignKey(i => i.SaleId);
@@ -94,9 +120,24 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 
         b.Entity<SaleItem>(e => e.HasOne(i => i.Product).WithMany().HasForeignKey(i => i.ProductId));
 
+        b.Entity<PurchaseOrder>(e =>
+        {
+            e.Property(p => p.Version).IsConcurrencyToken();
+            e.HasIndex(p => new { p.Status, p.CreatedAt });
+            e.HasOne(p => p.Supplier).WithMany().HasForeignKey(p => p.SupplierId);
+            e.HasOne(p => p.CreatedByUser).WithMany().HasForeignKey(p => p.CreatedByUserId);
+            e.HasMany(p => p.Items).WithOne(i => i.PurchaseOrder).HasForeignKey(i => i.PurchaseOrderId);
+        });
+
+        b.Entity<PurchaseOrderItem>(e =>
+        {
+            e.HasIndex(i => i.PurchaseOrderId);
+        });
+
         b.Entity<SaleReturn>(e =>
         {
             e.HasIndex(r => new { r.SaleId, r.RefundDate });
+            e.Property(r => r.Reason).HasMaxLength(500);
             e.HasOne(r => r.Sale).WithMany().HasForeignKey(r => r.SaleId);
             e.HasOne(r => r.Shift).WithMany().HasForeignKey(r => r.ShiftId);
             e.HasOne(r => r.ProcessedByUser).WithMany().HasForeignKey(r => r.ProcessedByUserId);
@@ -118,6 +159,56 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         });
 
         b.Entity<Setting>(e => e.HasIndex(s => s.SettingKey).IsUnique());
+        b.Entity<LowStockAlert>(e =>
+        {
+            e.Property(alert => alert.LastError).HasMaxLength(500);
+            e.HasOne(alert => alert.Product).WithMany().HasForeignKey(alert => alert.ProductId);
+            e.HasIndex(alert => alert.ProductId).IsUnique().HasFilter("\"ResolvedAt\" IS NULL");
+            e.HasIndex(alert => new { alert.SentAt, alert.NextAttemptAt });
+        });
+        b.Entity<Customer>(e =>
+        {
+            e.Property(c => c.Name).HasMaxLength(200);
+            e.Property(c => c.Email).HasMaxLength(200);
+            e.Property(c => c.Phone).HasMaxLength(50);
+            e.Property(c => c.Address).HasMaxLength(500);
+            e.Property(c => c.RowVersion).IsRowVersion();
+            e.HasIndex(c => c.Email).IsUnique().HasFilter("\"Email\" IS NOT NULL AND \"IsDeleted\" = false");
+        });
+        b.Entity<LoyaltyTransaction>(e =>
+        {
+            e.Property(t => t.Type).HasMaxLength(30);
+            e.Property(t => t.Note).HasMaxLength(300);
+            e.HasIndex(t => new { t.CustomerId, t.CreatedAt });
+            e.HasIndex(t => new { t.SaleId, t.Type }).IsUnique().HasFilter("\"SaleId\" IS NOT NULL");
+            e.HasIndex(t => new { t.SaleReturnId, t.Type }).IsUnique().HasFilter("\"SaleReturnId\" IS NOT NULL");
+            e.HasOne(t => t.Customer).WithMany().HasForeignKey(t => t.CustomerId);
+            e.HasOne(t => t.Sale).WithMany().HasForeignKey(t => t.SaleId);
+            e.HasOne(t => t.SaleReturn).WithMany().HasForeignKey(t => t.SaleReturnId);
+        });
+        b.Entity<Coupon>(e =>
+        {
+            e.Property(c => c.Code).HasMaxLength(40);
+            e.Property(c => c.Name).HasMaxLength(200);
+            e.HasIndex(c => c.Code).IsUnique();
+        });
+        b.Entity<ProductImageContent>(e =>
+        {
+            e.HasKey(content => content.ProductImageId);
+            e.HasOne<ProductImage>().WithOne().HasForeignKey<ProductImageContent>(content => content.ProductImageId);
+        });
+
+        b.Entity<ProductImage>(e =>
+        {
+            e.Property(i => i.StorageKey).HasMaxLength(100);
+            e.Property(i => i.ContentType).HasMaxLength(50);
+            e.HasIndex(i => new { i.ProductId, i.IsPrimary }).IsUnique().HasFilter("\"IsPrimary\" = true");
+        });
+        b.Entity<Sale>(e =>
+        {
+            e.HasOne(s => s.Customer).WithMany().HasForeignKey(s => s.CustomerId);
+            e.HasOne(s => s.Coupon).WithMany().HasForeignKey(s => s.CouponId);
+        });
 
         // Soft delete: hide IsDeleted rows from every query on entities implementing ISoftDelete.
         foreach (var type in b.Model.GetEntityTypes().Where(t => typeof(ISoftDelete).IsAssignableFrom(t.ClrType)))
@@ -137,12 +228,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         ChangeTracker.DetectChanges();
         ApplySoftDeleteAndTimestamps();
         var pending = CaptureAudit();
+        if (pending.Count == 0)
+            return await base.SaveChangesAsync(ct);
 
-        var result = await base.SaveChangesAsync(ct);
-
-        if (pending.Count > 0)
+        var ownsTransaction = Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction ? await Database.BeginTransactionAsync(ct) : null;
+        try
         {
-            // Second pass so newly generated primary keys are available for the audit rows.
+            var result = await base.SaveChangesAsync(ct);
             foreach (var p in pending)
             {
                 AuditLogs.Add(new AuditLog
@@ -153,12 +246,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
                     EntityName = p.Entry.Metadata.ClrType.Name,
                     EntityId = ((BaseEntity)p.Entry.Entity).Id.ToString(),
                     OldValues = p.Old,
-                    NewValues = p.New
+                    // Added graphs may still have temporary foreign keys when CaptureAudit runs.
+                    // Read the snapshot after EF has propagated database-generated keys.
+                    NewValues = p.Action == AuditAction.Create
+                        ? JsonSerializer.Serialize(p.Entry.Properties
+                            .Where(property => !AuditIgnored.Contains(property.Metadata.Name) && !property.Metadata.IsPrimaryKey())
+                            .ToDictionary(property => property.Metadata.Name, property => property.CurrentValue))
+                        : p.New
                 });
             }
             await base.SaveChangesAsync(ct);
+            if (ownsTransaction)
+                await transaction!.CommitAsync(ct);
+            return result;
         }
-        return result;
+        catch
+        {
+            if (ownsTransaction)
+                await transaction!.RollbackAsync(ct);
+            throw;
+        }
     }
 
     private void ApplySoftDeleteAndTimestamps()
@@ -187,10 +294,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 
             if (entry.State == EntityState.Added)
             {
-                var values = entry.Properties
-                    .Where(p => !AuditIgnored.Contains(p.Metadata.Name) && !p.Metadata.IsPrimaryKey())
-                    .ToDictionary(p => p.Metadata.Name, p => p.CurrentValue);
-                list.Add(new PendingAudit(entry, AuditAction.Create, null, JsonSerializer.Serialize(values)));
+                list.Add(new PendingAudit(entry, AuditAction.Create, null, null));
             }
             else if (entry.State == EntityState.Modified)
             {

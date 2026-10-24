@@ -3,10 +3,12 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, finalize, of, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthResponse } from '../models';
+import { CartStore } from '../cart/cart.store';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly cart = inject(CartStore);
   private readonly base = `${environment.apiUrl}/api/auth`;
 
   private readonly token = signal<string | null>(null);
@@ -27,7 +29,10 @@ export class AuthService {
   login(username: string, password: string): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.base}/login`, { username, password }, { withCredentials: true })
-      .pipe(tap((r) => this.apply(r)));
+      .pipe(tap((r) => {
+        this.cart.clear();
+        this.apply(r);
+      }));
   }
 
   logout(): Observable<unknown> {
@@ -65,12 +70,14 @@ export class AuthService {
   }
 
   clear(): void {
+    this.cart.clear();
     this.token.set(null);
     this.username.set('');
     this.role.set('');
   }
 
   private apply(r: AuthResponse): void {
+    if (this.username() && this.username() !== r.username) this.cart.clear();
     this.token.set(r.accessToken);
     this.username.set(r.username);
     this.role.set(r.role);

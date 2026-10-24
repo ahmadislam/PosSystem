@@ -1,13 +1,15 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import type { ChartConfiguration } from 'chart.js';
 import { PosApi } from '../../core/api/pos-api';
 import { apiError } from '../../core/http/api-error';
 import { DashboardSummaryDto, money } from '../../core/models';
 import { Toast } from '../../core/ui/toast';
+import { DashboardChart } from './dashboard-chart';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [DatePipe],
+  imports: [DatePipe, DashboardChart],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -20,11 +22,43 @@ export class Dashboard implements OnInit {
   readonly lowStock = signal<DashboardSummaryDto['lowStockProducts']>([]);
   readonly lowStockCount = signal(0);
   readonly revenue = signal(0);
+  readonly refunds = signal(0);
+  readonly netRevenue = signal(0);
   readonly count = signal(0);
   readonly bars = signal<{ label: string; value: number; pct: number }[]>([]);
   readonly monthlyBars = signal<{ label: string; value: number; pct: number }[]>([]);
   readonly topProducts = signal<DashboardSummaryDto['topSellingProducts']>([]);
   readonly categoryBars = signal<{ label: string; value: number; quantity: number; pct: number }[]>([]);
+  readonly monthlyChart = computed<ChartConfiguration>(() => ({
+    type: 'bar',
+    data: {
+      labels: this.monthlyBars().map((month) => month.label),
+      datasets: [{ label: 'Gross sales', data: this.monthlyBars().map((month) => month.value), backgroundColor: '#f6631f', hoverBackgroundColor: '#ff9d6a', borderRadius: 5, maxBarThickness: 42 }],
+    },
+    options: revenueOptions(),
+  }));
+  readonly productsChart = computed<ChartConfiguration>(() => ({
+    type: 'bar',
+    data: {
+      labels: this.topProducts().map((product) => product.productName),
+      datasets: [{ label: 'Gross sales', data: this.topProducts().map((product) => product.revenue), backgroundColor: '#f6631f', hoverBackgroundColor: '#ff9d6a', borderRadius: 5, maxBarThickness: 24 }],
+    },
+    options: { ...revenueOptions(), indexAxis: 'y' },
+  }));
+  readonly categoriesChart = computed<ChartConfiguration>(() => ({
+    type: 'doughnut',
+    data: {
+      labels: this.categoryBars().map((category) => category.label),
+      datasets: [{ label: 'Gross sales', data: this.categoryBars().map((category) => category.value), backgroundColor: ['#f6631f', '#ffad80', '#b8b8c2', '#787885', '#ce764d', '#53535f', '#e6c7b6', '#989084'], borderColor: '#18181b', borderWidth: 3, hoverOffset: 5 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#d4d4d8', padding: 14, usePointStyle: true, boxWidth: 9, font: { family: 'Inter, system-ui, sans-serif', size: 11 } } },
+        tooltip: { callbacks: { label: (context) => `${context.label}: ${money(Number(context.raw))}` } },
+      },
+    },
+  }));
 
   ngOnInit(): void {
     const end = new Date();
@@ -36,7 +70,9 @@ export class Dashboard implements OnInit {
       next: (summary) => {
         this.sales.set(summary.recentSales);
         this.count.set(summary.totalSales);
-        this.revenue.set(summary.revenue);
+        this.revenue.set(summary.grossSales);
+        this.refunds.set(summary.refunds);
+        this.netRevenue.set(summary.netRevenue);
         this.lowStockCount.set(summary.lowStockCount);
         this.lowStock.set(summary.lowStockProducts);
         this.bars.set(buildDailyBars(summary.dailySales, weekStart, 7));
@@ -47,6 +83,20 @@ export class Dashboard implements OnInit {
       error: (e) => this.toast.show(apiError(e), 'err'),
     });
   }
+}
+
+function revenueOptions(): ChartConfiguration['options'] {
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (context) => `Gross sales: ${money(Number(context.raw))}` } },
+    },
+    scales: {
+      x: { grid: { color: '#ffffff08' }, ticks: { color: '#a1a1aa', font: { family: 'Inter, system-ui, sans-serif', size: 11 }, maxRotation: 0, autoSkip: true }, border: { display: false } },
+      y: { beginAtZero: true, grid: { color: '#ffffff0d' }, ticks: { color: '#a1a1aa', font: { family: 'Inter, system-ui, sans-serif', size: 11 } }, border: { display: false } },
+    },
+  };
 }
 
 function localDate(date: Date): string {

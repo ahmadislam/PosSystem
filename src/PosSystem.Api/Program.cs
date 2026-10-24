@@ -12,6 +12,8 @@ using PosSystem.Application.Common;
 using PosSystem.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var serveClient = ClientHosting.Configure(builder);
+var forwardedHeaders = TrustedProxyConfiguration.Create(builder.Configuration.GetSection("ReverseProxy"));
 
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
           ?? throw new InvalidOperationException("Missing 'Jwt' configuration section.");
@@ -29,8 +31,6 @@ if (builder.Environment.IsProduction())
 var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
 if (!EmailOptions.IsValid(emailOptions))
     throw new InvalidOperationException("Email SMTP configuration is invalid. Verify host, port, sender address, TLS settings, and SMTP credential pairing.");
-if (builder.Environment.IsProduction() && !emailOptions.Enabled)
-    throw new InvalidOperationException("SMTP email delivery must be configured and enabled in Production.");
 
 builder.Services.AddSingleton(jwt);
 builder.Services.AddHttpContextAccessor();
@@ -44,7 +44,8 @@ builder.Services.AddHangfire(configuration => configuration
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
     .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(connectionString)));
-builder.Services.AddHangfireServer();
+builder.Services.AddHangfireServer(options => options.WorkerCount =
+    Math.Clamp(builder.Configuration.GetValue("Hangfire:WorkerCount", 2), 1, 20));
 
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -52,6 +53,7 @@ builder.Services.AddControllers()
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
 {
     o.MapInboundClaims = false;   // keep "sub" / "role" claim names as issued
+    o.EventsType = typeof(AuthorizationStateJwtEvents);
     o.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true, ValidIssuer = jwt.Issuer,
@@ -89,24 +91,37 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// Must precede authentication/limiting so only trusted proxies can supply the client IP/scheme.
+app.UseForwardedHeaders(forwardedHeaders);
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSwagger();       // public on purpose: the live Swagger link goes on your CV
 app.UseSwaggerUI();
 app.UseCors("web");
+if (serveClient)
+{
+    ClientHosting.UseClientFiles(app);
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
+if (serveClient) ClientHosting.MapClientFallback(app);
 
 await DbSeeder.SeedAsync(app.Services, app.Configuration);
+var recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
+recurringJobs.AddOrUpdate<LowStockAlertDispatcher>(
+    "low-stock-alert-dispatch",
+    job => job.DispatchAsync(CancellationToken.None),
+    Cron.Minutely,
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 if (app.Configuration.GetValue<bool>("Email:Enabled"))
 {
-    RecurringJob.AddOrUpdate<DailySalesReportJob>(
+    recurringJobs.AddOrUpdate<DailySalesReportJob>(
         "daily-sales-summary",
         job => job.SendAsync(CancellationToken.None),
         Cron.Daily,
         new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
-    RecurringJob.AddOrUpdate<DailySalesReportJob>(
+    recurringJobs.AddOrUpdate<DailySalesReportJob>(
         "monthly-sales-summary",
         job => job.SendMonthlyAsync(CancellationToken.None),
         "15 0 1 * *",
@@ -114,8 +129,8 @@ if (app.Configuration.GetValue<bool>("Email:Enabled"))
 }
 else
 {
-    RecurringJob.RemoveIfExists("daily-sales-summary");
-    RecurringJob.RemoveIfExists("monthly-sales-summary");
+    recurringJobs.RemoveIfExists("daily-sales-summary");
+    recurringJobs.RemoveIfExists("monthly-sales-summary");
     app.Logger.LogInformation("Email delivery is disabled; the daily sales report is not scheduled.");
 }
 app.Run();

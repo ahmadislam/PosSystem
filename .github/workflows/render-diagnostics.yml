@@ -1,0 +1,42 @@
+name: Render diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/release-readiness]
+    paths:
+      - .github/workflows/render-diagnostics.yml
+      - scripts/render-diagnostics.py
+      - tests/render-diagnostics/**
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test diagnostic safeguards
+        run: python -m unittest discover -s tests/render-diagnostics -v
+      - name: Inspect Render service without modifying it
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          RENDER_PUBLIC_URL: ${{ vars.RENDER_PUBLIC_URL || 'https://possystem-1-26mq.onrender.com' }}
+          RENDER_DIAGNOSTICS_OUTPUT: render-diagnostics.json
+        run: python scripts/render-diagnostics.py
+      - name: Save safe diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-diagnostics
+          path: render-diagnostics.json
+          if-no-files-found: ignore
+          retention-days: 3

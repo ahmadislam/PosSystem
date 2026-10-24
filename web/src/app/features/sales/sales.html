@@ -22,7 +22,7 @@
   <table>
     <thead>
       <tr>
-        <th>Invoice</th><th>When</th><th>Pay</th><th>Status</th><th class="n">Total</th><th></th>
+        <th>Invoice</th><th>When</th><th>Customer</th><th>Pay</th><th>Status</th><th class="n">Total</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -30,16 +30,18 @@
         <tr>
           <td class="mono">{{ s.invoiceNumber }}</td>
           <td>{{ s.saleDate | date:'short' }}</td>
+          <td>{{ s.customerName || 'Walk-in' }} @if (s.couponCode) { <small>· {{ s.couponCode }}</small> }</td>
           <td>{{ s.paymentMethod }}</td>
           <td>{{ s.status }}</td>
           <td class="n">{{ money(s.totalAmount) }}</td>
           <td class="actions">
-            <button type="button" class="tiny" (click)="print(s)">Receipt</button>
+            <button type="button" class="tiny" (click)="print(s)">Print invoice</button>
+            <button type="button" class="tiny" (click)="downloadInvoice(s)">Download PDF</button>
             <button type="button" class="tiny" (click)="openReturns(s)">{{ s.status === 'Refunded' ? 'Returns' : 'Return' }}</button>
           </td>
         </tr>
       } @empty {
-        <tr><td colspan="6" class="empty">No sales match this date range.</td></tr>
+        <tr><td colspan="7" class="empty">No sales match this date range.</td></tr>
       }
     </tbody>
   </table>
@@ -69,6 +71,10 @@
           <option value="Online">Online</option>
         </select>
       </label>
+      <label>
+        Return reason (optional)
+        <textarea [(ngModel)]="returnReason" maxlength="500" rows="2"></textarea>
+      </label>
       <p class="muted">Refund totals are calculated from the original sale prices, discount, and tax.</p>
 
       <div class="return-lines">
@@ -94,7 +100,10 @@
         <section class="return-history">
           <h3>Previous returns</h3>
           @for (entry of returnHistory(); track entry.id) {
-            <p>{{ entry.refundDate | date:'short' }} · {{ entry.refundMethod }} · {{ money(entry.totalAmount) }}</p>
+            <p>
+              {{ entry.refundDate | date:'short' }} · {{ entry.refundMethod }} · {{ money(entry.totalAmount) }}
+              @if (entry.reason) { <span> · {{ entry.reason }}</span> }
+            </p>
           }
         </section>
       }

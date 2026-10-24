@@ -22,6 +22,26 @@ export interface EmailSettingsDto {
   alertsEnabled: boolean;
 }
 
+export interface BackgroundJobStatusDto {
+  failed: number;
+  enqueued: number;
+  scheduled: number;
+}
+
+export interface LowStockAlertDto {
+  id: number;
+  sku: string;
+  productName: string;
+  stockQuantity: number;
+  minStockThreshold: number;
+  detectedAt: string;
+  sentAt: string | null;
+  resolvedAt: string | null;
+  lastAttemptAt: string | null;
+  deliveryAttempts: number;
+  lastError: string | null;
+}
+
 export interface PagedResult<T> {
   items: T[];
   page: number;
@@ -43,6 +63,7 @@ export interface ProductDto {
   description: string | null;
   categoryId: number;
   categoryName: string;
+  defaultSupplierId: number | null;
   costPrice: number;
   salePrice: number;
   taxRate: number;
@@ -50,6 +71,54 @@ export interface ProductDto {
   minStockThreshold: number;
   isActive: boolean;
   isLowStock: boolean;
+  primaryImageUrl: string | null;
+}
+
+export interface CustomerDto {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  loyaltyPoints: number;
+  isActive: boolean;
+}
+export interface CustomerRequest {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  isActive: boolean;
+}
+export interface ProductImageDto {
+  id: number;
+  contentType: string;
+  isPrimary: boolean;
+  imageUrl: string;
+}
+export interface LoyaltyTransactionDto {
+  id: number;
+  createdAt: string;
+  pointsChange: number;
+  balanceAfter: number;
+  type: string;
+  note: string | null;
+}
+export interface CouponDto {
+  id: number;
+  code: string;
+  name: string;
+  isPercentage: boolean;
+  value: number;
+  startsAt: string;
+  endsAt: string;
+  isActive: boolean;
+  maxRedemptions: number | null;
+  redemptionCount: number;
+}
+export interface LoyaltyRulesDto {
+  earnPointsPerCurrencyUnit: number;
+  redemptionPointsPerCurrencyUnit: number;
 }
 
 export interface ProductRequest {
@@ -57,6 +126,7 @@ export interface ProductRequest {
   name: string;
   description?: string | null;
   categoryId: number;
+  defaultSupplierId?: number | null;
   costPrice: number;
   salePrice: number;
   taxRate: number;
@@ -70,6 +140,55 @@ export type SaleStatus = 'Completed' | 'PartiallyReturned' | 'Refunded';
 export type ShiftStatus = 'Open' | 'PendingClose' | 'Closed';
 export type StockMovementType = 'Purchase' | 'Sale' | 'Return' | 'Adjustment';
 export type AuditAction = 'Create' | 'Update' | 'Delete';
+export type PurchaseOrderStatus = 'Draft' | 'Ordered' | 'Received' | 'Cancelled';
+
+export interface SupplierDto {
+  id: number;
+  name: string;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  isActive: boolean;
+}
+
+export interface SupplierRequest {
+  name: string;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  isActive: boolean;
+}
+
+export interface PurchaseOrderLineRequest {
+  productId: number;
+  quantity: number;
+  unitCost: number;
+}
+
+export interface PurchaseOrderItemDto extends PurchaseOrderLineRequest {
+  id: number;
+  sku: string;
+  productName: string;
+  lineTotal: number;
+}
+
+export interface PurchaseOrderDto {
+  id: number;
+  supplierId: number;
+  supplierName: string;
+  createdByUserId: number;
+  status: PurchaseOrderStatus;
+  createdAt: string;
+  orderedAt: string | null;
+  receivedAt: string | null;
+  totalCost: number;
+  items: PurchaseOrderItemDto[];
+}
+
 
 export interface ShiftDto {
   id: number;
@@ -106,6 +225,16 @@ export interface SaleDto {
   paymentMethod: PaymentMethod;
   status: SaleStatus;
   items: SaleItemDto[];
+  customerId: number | null;
+  customerName: string | null;
+  couponCode: string | null;
+  loyaltyPointsEarned: number;
+  loyaltyPointsRedeemed: number;
+  cashTendered: number | null;
+  changeDue: number | null;
+  paymentProvider?: string | null;
+  paymentReference?: string | null;
+  paymentStatus?: string | null;
 }
 
 export interface SaleReturnItemDto {
@@ -128,6 +257,7 @@ export interface SaleReturnDto {
   processedByUserId: number;
   refundDate: string;
   refundMethod: PaymentMethod;
+  reason: string | null;
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
@@ -143,6 +273,9 @@ export interface DailySalesDto {
 export interface DashboardSummaryDto {
   totalSales: number;
   revenue: number;
+  grossSales: number;
+  refunds: number;
+  netRevenue: number;
   lowStockCount: number;
   dailySales: DailySalesDto[];
   monthlyRevenue: MonthlyRevenueDto[];
@@ -206,9 +339,10 @@ export interface CartLine {
 
 /** Matches backend PricingCalculator (tax on gross − discount). */
 export function lineTotals(unitPrice: number, quantity: number, discountAmount: number, taxRatePercent: number) {
-  const gross = unitPrice * quantity;
-  const net = gross - discountAmount;
-  const tax = Math.round((net * taxRatePercent) / 100 * 100) / 100;
+  const gross = Math.round(unitPrice * quantity * 100) / 100;
+  const discount = Math.round(Math.max(0, Math.min(discountAmount, gross)) * 100) / 100;
+  const net = gross - discount;
+  const tax = Math.round(((net * taxRatePercent) / 100 + Number.EPSILON) * 100) / 100;
   return { gross, tax, total: net + tax };
 }
 

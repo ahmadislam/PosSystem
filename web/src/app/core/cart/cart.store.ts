@@ -37,11 +37,14 @@ export class CartStore {
   }
 
   setQuantity(productId: number, quantity: number): void {
+    if (!Number.isFinite(quantity)) return;
     this.linesSig.update((lines) =>
       lines.flatMap((l) => {
         if (l.product.id !== productId) return [l];
         const q = Math.max(0, Math.min(Math.floor(quantity), l.product.stockQuantity));
-        return q === 0 ? [] : [{ ...l, quantity: q }];
+        return q === 0
+          ? []
+          : [{ ...l, quantity: q, discountAmount: clampMoney(l.discountAmount, l.product.salePrice * q) }];
       }),
     );
   }
@@ -51,7 +54,7 @@ export class CartStore {
       lines.map((l) => {
         if (l.product.id !== productId) return l;
         const max = l.product.salePrice * l.quantity;
-        return { ...l, discountAmount: Math.max(0, Math.min(discountAmount, max)) };
+        return { ...l, discountAmount: clampMoney(discountAmount, max) };
       }),
     );
   }
@@ -63,4 +66,10 @@ export class CartStore {
   clear(): void {
     this.linesSig.set([]);
   }
+}
+
+function clampMoney(value: number, maximum: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const cents = Math.round(Math.max(0, Math.min(value, maximum)) * 100);
+  return cents / 100;
 }

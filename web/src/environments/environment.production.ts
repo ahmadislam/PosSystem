@@ -1,5 +1,12 @@
+import { productionApiOrigin } from './runtime-config';
+
+declare global {
+  interface Window {
+    POS_RUNTIME_CONFIG?: { apiOrigin: string };
+  }
+}
+
 export const environment = {
   production: true,
-  /** Render API origin, no trailing slash. Override before deploying to Vercel. */
-  apiUrl: 'https://YOUR-API.onrender.com',
+  apiUrl: productionApiOrigin(window.POS_RUNTIME_CONFIG?.apiOrigin),
 };
