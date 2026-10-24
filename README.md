@@ -2,6 +2,18 @@
 
 ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular point-of-sale frontend.
 
+## Product demo
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/ahmadislam/PosSystem/project-demo-assets/Counter-POS-Demo.mp4">
+    <img src="https://raw.githubusercontent.com/ahmadislam/PosSystem/project-demo-assets/Counter-POS-Preview.webp" width="720" alt="Animated preview of the Counter POS checkout, inventory, reporting, and management workflow">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/ahmadislam/PosSystem/project-demo-assets/Counter-POS-Demo.mp4"><strong>▶ Watch the full 36-second product demo</strong></a>
+</p>
+
 ## Technology stack
 - **Frontend:** Angular 22, TypeScript, standalone components, RxJS, native CSS/SVG-style charts
 - **Backend:** .NET 10, ASP.NET Core Web API, Clean Architecture, JWT access tokens and rotating HttpOnly refresh cookies
