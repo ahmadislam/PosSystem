@@ -7,10 +7,9 @@ ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular point
 [OpenAPI JSON](https://possystem-1-26mq.onrender.com/swagger/v1/swagger.json) ·
 [Health](https://possystem-1-26mq.onrender.com/health)
 
-The live deployment was independently checked on 2026-10-23 through the Render API and public
-HTTPS probes. Render reported the release-branch deployment as live, while `/health`, `/login`,
-and the OpenAPI document each returned HTTP 200. Free Render instances may take time to wake up.
-Login accounts and secrets are not published.
+This is the deployment URL supplied for the project. The audit environment's network proxy blocks
+access to that host; current public health and the deployed commit are not independently verified.
+Free Render instances may take time to wake up. Login accounts and secrets are not published.
 
 [Requirements audit](docs/requirements-audit.md) · [API reference](docs/api.md) ·
 [Architecture, full ERD, checkout and deployment diagrams](docs/architecture.md) ·
@@ -525,20 +524,18 @@ locally without sending mail to external recipients.
 
 ### Production verification
 
-Repository tests alone cannot establish that a live deployment works. This portfolio deployment
-also has read-only provider diagnostics and public endpoint probes; see the
-[requirements audit](docs/requirements-audit.md) for the dated evidence. Before enabling
-real-store traffic, verify the actual public frontend/API HTTPS origins and exact
+Repository tests cannot provision provider accounts or establish that a live deployment works.
+Before enabling real-store traffic, verify the actual public frontend/API HTTPS origins and exact
 CORS entries, the database connection/health, persistent image disk and backup retention, and SMTP
 sender verification/credentials. Use the application test-email flow and confirm delivery in a
-controlled manager mailbox. The current demo's SMTP test message was manually confirmed received
-on 2026-10-23. Hook configuration, a successful build, or a local SMTP capture by itself is not
+controlled manager mailbox. Hook configuration, a successful build, or a local SMTP capture is not
 proof of external delivery.
 
-Configure provider credentials and secret values through hosting/environment settings, never in
-source, shell history, test artifacts or chat. The repository publishes no provider credentials.
-Local TLS SMTP capture proves the mail code can deliver to its test server; the dated live checks
-above separately establish the current Render deployment and one manually confirmed SMTP delivery.
+Configure provider credentials and secret values through the hosting/environment settings, never
+in source, shell history, test artifacts or chat. No live Render/Vercel/Supabase/Brevo account or
+delivery is implied by the configuration templates. Local TLS SMTP capture proves the mail code
+can deliver to its test server; public deployment and real mailbox delivery require the configured
+provider account and remain separate checks.
 
 Test each supported browser against the real public origins: login, reload to restore its refresh
 cookie, let access expire and retry a protected request, use two tabs, logout, and verify a disabled

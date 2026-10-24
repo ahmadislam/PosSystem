@@ -34,13 +34,7 @@ The existing public service address is [possystem-1-26mq.onrender.com](https://p
 - [Swagger UI](https://possystem-1-26mq.onrender.com/swagger/index.html)
 - [OpenAPI document](https://possystem-1-26mq.onrender.com/swagger/v1/swagger.json)
 
-Live verification completed on 2026-10-23. The Render API reported `PosSystem-1` on
-`feature/release-readiness`, Git auto-deploy disabled, and the audited deployment in `live` state.
-Independent probes returned HTTP 200 for `/health`, `/login`, and
-`/swagger/v1/swagger.json`. The matching [GitHub push run](https://github.com/ahmadislam/PosSystem/actions/runs/40037957626)
-passed all six readiness jobs before its deploy job succeeded. Render log retrieval returned 403
-for the read-only diagnostic key; this did not prevent deployment metadata or public endpoint
-verification.
+During the 2026-10-23 repository audit, this execution environment's network proxy rejected access to the public host with `403 Forbidden`. These links therefore identify the existing target; they are **not an independent verification of its current health or deployed commit**. The database, SMTP secrets, and hosting dashboard credentials were not accessed or changed.
 
 ## Read-only Render diagnostics
 
