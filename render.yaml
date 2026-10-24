@@ -23,6 +23,14 @@ services:
         value: admin
       - key: Seed__AdminEmail
         value: admin@example.com
+      - key: Seed__DemoData
+        value: "true"
+      - key: DemoAccess__Enabled
+        value: "true"
+      - key: DemoAccess__Username
+        value: portfolio-demo
+      - key: DemoAccess__Email
+        value: portfolio-demo@example.invalid
       - key: Email__Enabled
         value: "false"
       - key: Hangfire__WorkerCount

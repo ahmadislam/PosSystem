@@ -25,6 +25,9 @@
     <div class="who">
       <span class="name">{{ auth.username() }}</span>
       <span class="role">{{ auth.role() }}</span>
+      @if (auth.isDemo()) {
+        <span class="demo-chip">Portfolio demo</span>
+      }
       @if (cart.count() > 0) {
         <span class="cart-chip">{{ cart.count() }} in cart</span>
       }

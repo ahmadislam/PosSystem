@@ -18,6 +18,10 @@ logout use that cookie. Login, refresh and logout require an exact allowed `Orig
 For cross-origin frontend requests include credentials and configure exact CORS origins; the
 combined Render deployment uses the same origin for client and API.
 
+When `DemoAccess:Enabled` is true, `POST /api/auth/demo` starts a session for the configured
+Manager demo account without accepting a username or password from the caller. It uses the same
+origin validation, JWT, refresh-cookie rotation, and authorization checks as staff login.
+
 Roles below: **Staff** = any authenticated Admin, Manager or Cashier; **Management** = Admin or
 Manager; **Admin** = Admin only. Cashiers can only read/return their own sales, and returns require
 the user's open shift. Protected account changes invalidate active JWT authorization stamps.
@@ -35,6 +39,7 @@ Methods that share a path are listed separately where their permissions differ.
 | Method | Path | Access | Purpose / query |
 |---|---|---|---|
 | POST | `/api/auth/login` | Public + allowed Origin | Username/password; token and refresh cookie |
+| POST | `/api/auth/demo` | Public + allowed Origin | Start the configured portfolio demo session without credentials |
 | POST | `/api/auth/refresh` | Refresh cookie + allowed Origin | Rotate refresh session and issue access token |
 | POST | `/api/auth/logout` | Allowed Origin | Revoke presented refresh session; clear cookie |
 | GET | `/api/auth/me` | Staff | Current identity and role |

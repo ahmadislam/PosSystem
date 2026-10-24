@@ -14,6 +14,7 @@ export class AuthService {
   private readonly token = signal<string | null>(null);
   readonly username = signal('');
   readonly role = signal('');
+  readonly isDemo = signal(false);
   readonly ready = signal(false);
 
   readonly isSignedIn = computed(() => !!this.token());
@@ -32,6 +33,15 @@ export class AuthService {
       .pipe(tap((r) => {
         this.cart.clear();
         this.apply(r);
+      }));
+  }
+
+  loginDemo(): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(`${this.base}/demo`, {}, { withCredentials: true })
+      .pipe(tap((response) => {
+        this.cart.clear();
+        this.apply(response);
       }));
   }
 
@@ -74,6 +84,7 @@ export class AuthService {
     this.token.set(null);
     this.username.set('');
     this.role.set('');
+    this.isDemo.set(false);
   }
 
   private apply(r: AuthResponse): void {
@@ -81,5 +92,6 @@ export class AuthService {
     this.token.set(r.accessToken);
     this.username.set(r.username);
     this.role.set(r.role);
+    this.isDemo.set(r.isDemo);
   }
 }

@@ -42,9 +42,9 @@ Existing file-mode deployments keep their original file storage; this does not m
 
 ## 3. Sign in and check the demo
 
-Open the service URL, sign in as `admin` using `Seed__AdminPassword` from Render's secure
-environment settings, and create sample categories/products. Do not publish the admin password.
-Create a limited Cashier account if you want to share access with someone.
+Open the service URL and select **Explore live demo**. The server creates a dedicated Manager demo
+account with an inaccessible random password, while the administrator password remains private.
+Use the administrator account only when you need to manage staff credentials.
 
 Verify `/health` returns `Healthy`, then open a shift, record a sample sale, download its PDF,
 return an item, and close the shift. Upload a small product image and confirm it remains after

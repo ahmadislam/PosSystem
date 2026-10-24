@@ -11,11 +11,17 @@ public record AuthResult(AuthResponse Response, string RefreshToken, DateTime Re
 public interface IAuthService
 {
     Task<AuthResult> LoginAsync(LoginRequest request, CancellationToken ct = default);
+    Task<AuthResult> LoginDemoAsync(string username, CancellationToken ct = default);
     Task<AuthResult> RefreshAsync(string refreshToken, CancellationToken ct = default);
     Task LogoutAsync(string? refreshToken, CancellationToken ct = default);
 }
 
-public class AuthService(IAppDbContext db, ITokenService tokens, IPasswordHasher<User> hasher, JwtSettings jwt) : IAuthService
+public class AuthService(
+    IAppDbContext db,
+    ITokenService tokens,
+    IPasswordHasher<User> hasher,
+    JwtSettings jwt,
+    DemoAccessSettings? demoAccess = null) : IAuthService
 {
     public async Task<AuthResult> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
@@ -23,6 +29,18 @@ public class AuthService(IAppDbContext db, ITokenService tokens, IPasswordHasher
         if (user is null ||
             hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password) == PasswordVerificationResult.Failed)
             throw new UnauthorizedAppException("Invalid username or password.");
+
+        var issued = await IssueAsync(user, ct);
+        return issued.Result;
+    }
+
+    public async Task<AuthResult> LoginDemoAsync(string username, CancellationToken ct = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(
+            candidate => candidate.Username == username && candidate.IsActive,
+            ct);
+        if (user is null)
+            throw new UnauthorizedAppException("The portfolio demo is temporarily unavailable.");
 
         var issued = await IssueAsync(user, ct);
         return issued.Result;
@@ -92,7 +110,15 @@ public class AuthService(IAppDbContext db, ITokenService tokens, IPasswordHasher
 
         var access = tokens.CreateAccessToken(user, out var expires);
         return (
-            new AuthResult(new AuthResponse(access, expires, user.Username, user.Role.ToString()), raw, entity.ExpiresAt),
+            new AuthResult(new AuthResponse(
+                access,
+                expires,
+                user.Username,
+                user.Role.ToString(),
+                demoAccess?.Enabled == true && string.Equals(
+                    user.Username,
+                    demoAccess.Username,
+                    StringComparison.OrdinalIgnoreCase)), raw, entity.ExpiresAt),
             entity.Id);
     }
 

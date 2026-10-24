@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PosSystem.Domain.Entities;
@@ -26,6 +27,34 @@ public static class DbSeeder
             };
             admin.PasswordHash = hasher.HashPassword(admin, config["Seed:AdminPassword"] ?? "Admin@12345");
             db.Users.Add(admin);
+        }
+
+        if (config.GetValue<bool>("DemoAccess:Enabled"))
+        {
+            var demoUsername = config["DemoAccess:Username"]?.Trim();
+            if (string.IsNullOrWhiteSpace(demoUsername))
+                throw new InvalidOperationException("DemoAccess:Username must be configured when demo access is enabled.");
+
+            var demo = db.Users.Local.FirstOrDefault(user => user.Username == demoUsername)
+                       ?? await db.Users.FirstOrDefaultAsync(user => user.Username == demoUsername);
+            if (demo is null)
+            {
+                demo = new User
+                {
+                    Username = demoUsername,
+                    Email = config["DemoAccess:Email"]?.Trim() ?? "portfolio-demo@example.invalid",
+                    Role = UserRole.Manager,
+                    IsActive = true
+                };
+                var inaccessiblePassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
+                demo.PasswordHash = hasher.HashPassword(demo, inaccessiblePassword);
+                db.Users.Add(demo);
+            }
+            else
+            {
+                demo.Role = UserRole.Manager;
+                demo.IsActive = true;
+            }
         }
 
         await ApplyAdminPasswordRecoveryAsync(db, hasher, config, scope.ServiceProvider);

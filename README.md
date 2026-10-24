@@ -9,7 +9,8 @@ ASP.NET Core 10 Web API (Clean Architecture) + PostgreSQL, with an Angular point
 
 This is the deployment URL supplied for the project. The audit environment's network proxy blocks
 access to that host; current public health and the deployed commit are not independently verified.
-Free Render instances may take time to wake up. Login accounts and secrets are not published.
+Free Render instances may take time to wake up. Select **Explore live demo** on the login page to
+open the complete management workspace without credentials; administrator accounts remain private.
 
 [Requirements audit](docs/requirements-audit.md) · [API reference](docs/api.md) ·
 [Architecture, full ERD, checkout and deployment diagrams](docs/architecture.md) ·
@@ -311,7 +312,7 @@ report downloads and checkout idempotency.
 
 | Area | Endpoints | Access |
 |---|---|---|
-| Authentication | `POST /api/auth/login`, `/refresh`, `/logout`; `GET /api/auth/me` | Public login/refresh; authenticated identity |
+| Authentication | `POST /api/auth/login`, `/demo`, `/refresh`, `/logout`; `GET /api/auth/me` | Public staff login and passwordless portfolio demo; authenticated identity |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` | Authenticated reads; Admin/Manager writes |
 | Products | `GET/POST /api/products`, `GET/PUT/DELETE /api/products/{id}`, `GET /api/products/by-sku/{sku}`, `POST /api/products/{id}/adjust-stock` | Authenticated reads; Admin/Manager writes |
 | Suppliers and purchasing | `/api/suppliers`; `/api/purchase-orders` (create, edit draft, order, receive, cancel) | Admin/Manager |

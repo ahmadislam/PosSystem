@@ -153,6 +153,43 @@ public class AuthSecurityTests
     }
 
     [Fact]
+    public async Task Portfolio_demo_login_issues_a_session_without_a_password()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AuthTestDbContext>().UseSqlite(connection).Options;
+        var hasher = new PasswordHasher<User>();
+
+        await using var db = new AuthTestDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        var demo = new User
+        {
+            Username = "portfolio-demo",
+            Email = "portfolio-demo@example.invalid",
+            Role = PosSystem.Domain.Enums.UserRole.Manager
+        };
+        demo.PasswordHash = hasher.HashPassword(demo, "an-inaccessible-random-demo-secret");
+        db.Users.Add(demo);
+        await db.SaveChangesAsync();
+
+        var service = new AuthService(
+            db,
+            new JwtTokenService(new JwtSettings { Key = SigningKey }),
+            hasher,
+            new JwtSettings { Key = SigningKey },
+            new DemoAccessSettings { Enabled = true, Username = "portfolio-demo" });
+
+        var login = await service.LoginDemoAsync("portfolio-demo");
+
+        Assert.Equal("portfolio-demo", login.Response.Username);
+        Assert.Equal("Manager", login.Response.Role);
+        Assert.True(login.Response.IsDemo);
+        Assert.NotEmpty(login.Response.AccessToken);
+        Assert.NotEmpty(login.RefreshToken);
+        Assert.Single(await db.RefreshTokens.ToListAsync());
+    }
+
+    [Fact]
     public async Task Refresh_rotation_is_atomic_and_replaying_old_token_revokes_the_new_session()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

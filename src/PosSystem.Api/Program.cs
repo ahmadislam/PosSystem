@@ -18,6 +18,9 @@ var forwardedHeaders = TrustedProxyConfiguration.Create(builder.Configuration.Ge
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
           ?? throw new InvalidOperationException("Missing 'Jwt' configuration section.");
 if (jwt.Key.Length < 32) throw new InvalidOperationException("Jwt:Key must be at least 32 characters.");
+var demoAccess = builder.Configuration.GetSection("DemoAccess").Get<DemoAccessSettings>() ?? new DemoAccessSettings();
+if (demoAccess.Enabled && string.IsNullOrWhiteSpace(demoAccess.Username))
+    throw new InvalidOperationException("DemoAccess:Username must be configured when demo access is enabled.");
 
 if (builder.Environment.IsProduction())
 {
@@ -33,6 +36,7 @@ if (!EmailOptions.IsValid(emailOptions))
     throw new InvalidOperationException("Email SMTP configuration is invalid. Verify host, port, sender address, TLS settings, and SMTP credential pairing.");
 
 builder.Services.AddSingleton(jwt);
+builder.Services.AddSingleton(demoAccess);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddPosServices(builder.Configuration);
 

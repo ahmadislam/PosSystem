@@ -30,6 +30,11 @@
     }
 
     <button type="submit" class="submit" [disabled]="busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
+    <div class="demo-separator"><span>Portfolio preview</span></div>
+    <button type="button" class="demo-access" [disabled]="demoBusy() || busy()" (click)="exploreDemo()">
+      <span>{{ demoBusy() ? 'Opening demo…' : 'Explore live demo' }}</span>
+      <small>No account or password required</small>
+    </button>
     <p class="secure-note"><span>●</span> Secure staff access · Your session is protected</p>
   </form>
 </section></main>

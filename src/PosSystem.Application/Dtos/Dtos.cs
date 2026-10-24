@@ -9,7 +9,7 @@ public class LoginRequest
     [Required] public string Username { get; set; } = string.Empty;
     [Required] public string Password { get; set; } = string.Empty;
 }
-public record AuthResponse(string AccessToken, DateTime ExpiresAt, string Username, string Role);
+public record AuthResponse(string AccessToken, DateTime ExpiresAt, string Username, string Role, bool IsDemo);
 
 // ---- Staff ----
 public class CreateStaffRequest

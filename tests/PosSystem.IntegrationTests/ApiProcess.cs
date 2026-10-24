@@ -60,6 +60,7 @@ internal sealed class ApiProcess : IAsyncDisposable
         start.Environment["Seed__AdminUsername"] = "admin";
         start.Environment["Seed__AdminPassword"] = Password;
         start.Environment["Seed__AdminEmail"] = "admin@example.test";
+        start.Environment["DemoAccess__Enabled"] = "false";
         start.Environment["Jwt__Key"] = "integration-only-signing-key-with-more-than-thirty-two-characters";
         start.Environment["Cors__Origins__0"] = "http://localhost:4200";
         start.Environment["Email__Enabled"] = "false";

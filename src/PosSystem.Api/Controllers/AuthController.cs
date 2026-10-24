@@ -39,6 +39,39 @@ public class AuthController(IAuthService auth, IConfiguration configuration, ILo
         }
     }
 
+    /// <summary>Starts the configured portfolio demo session without exposing staff credentials.</summary>
+    [HttpPost("demo"), AllowAnonymous]
+    public async Task<ActionResult<AuthResponse>> Demo(CancellationToken ct)
+    {
+        if (!HasAllowedOrigin()) return StatusCode(StatusCodes.Status403Forbidden);
+        if (!configuration.GetValue<bool>("DemoAccess:Enabled")) return NotFound();
+
+        var username = configuration["DemoAccess:Username"]?.Trim();
+        if (string.IsNullOrWhiteSpace(username))
+            throw new InvalidOperationException("DemoAccess:Username must be configured when demo access is enabled.");
+
+        var clientAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        if (loginLimiter.GetRetryAfter(clientAddress, username) is { } retryAfter)
+        {
+            Response.Headers["Retry-After"] = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+            return StatusCode(StatusCodes.Status429TooManyRequests);
+        }
+
+        try
+        {
+            var result = await auth.LoginDemoAsync(username, ct);
+            loginLimiter.RecordSuccess(clientAddress, username);
+            SetCookie(result);
+            Response.Headers["Cache-Control"] = "no-store";
+            return Ok(result.Response);
+        }
+        catch (UnauthorizedAppException)
+        {
+            loginLimiter.RecordFailure(clientAddress, username);
+            throw;
+        }
+    }
+
     [HttpPost("refresh"), AllowAnonymous]
     public async Task<ActionResult<AuthResponse>> Refresh(CancellationToken ct)
     {

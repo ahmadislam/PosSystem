@@ -3,6 +3,7 @@ export interface AuthResponse {
   expiresAt: string;
   username: string;
   role: string;
+  isDemo: boolean;
 }
 
 export type UserRole = 'Admin' | 'Manager' | 'Cashier';

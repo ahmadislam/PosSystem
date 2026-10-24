@@ -15,6 +15,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   const operation = requestUrl.pathname.replace(/\/+$/, '');
   const isPublicAuth = operation === '/api/auth/login'
+    || operation === '/api/auth/demo'
     || operation === '/api/auth/refresh'
     || operation === '/api/auth/logout';
   const token = auth.accessToken();

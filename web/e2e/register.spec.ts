@@ -15,6 +15,17 @@ async function login(page: Page) {
   await expect(page.getByRole('heading', { name: 'Register', exact: true })).toBeVisible();
 }
 
+test('portfolio visitors can explore the full demo without credentials', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByRole('button', { name: /Explore live demo/i }).click();
+  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Inventory', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Suppliers & purchasing', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Customers', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'History', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Settings', exact: true })).toBeVisible();
+});
+
 async function api(request: APIRequestContext) {
   const response = await request.post(`${apiOrigin}/api/auth/login`, {
     headers: { Origin: browserOrigin },

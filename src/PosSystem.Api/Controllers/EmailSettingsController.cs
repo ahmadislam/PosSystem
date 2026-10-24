@@ -13,11 +13,14 @@ public sealed class EmailSettingsController(
     IAppDbContext db,
     IOptions<EmailOptions> emailOptions,
     IEmailSender sender,
+    DemoAccessSettings demoAccess,
     ILogger<EmailSettingsController> logger) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<EmailSettingsDto>> Get(CancellationToken ct)
     {
+        if (IsDemo()) return Ok(new EmailSettingsDto(false, null, false));
+
         var values = await db.Settings.AsNoTracking()
             .Where(setting => setting.SettingKey == "ManagerEmail" || setting.SettingKey == "AlertsEnabled")
             .ToDictionaryAsync(setting => setting.SettingKey, setting => setting.Value, ct);
@@ -30,6 +33,8 @@ public sealed class EmailSettingsController(
     [HttpPut]
     public async Task<ActionResult<EmailSettingsDto>> Update(UpdateEmailSettingsRequest request, CancellationToken ct)
     {
+        if (IsDemo()) return Forbid();
+
         var managerEmail = await db.Settings.FirstOrDefaultAsync(
             setting => setting.SettingKey == "ManagerEmail", ct);
         var alertsEnabled = await db.Settings.FirstOrDefaultAsync(
@@ -47,6 +52,8 @@ public sealed class EmailSettingsController(
     [HttpPost("test"), Authorize(Roles = "Admin")]
     public async Task<IActionResult> SendTest(CancellationToken ct)
     {
+        if (IsDemo()) return Forbid();
+
         if (!emailOptions.Value.Enabled)
             throw new BadRequestException("SMTP delivery is disabled. Configure Email__Enabled and valid SMTP settings on the server.");
 
@@ -61,4 +68,9 @@ public sealed class EmailSettingsController(
         logger.LogInformation("Sent SMTP test message to the configured manager recipient.");
         return Ok(new { message = "Test email sent to the configured manager address." });
     }
+
+    private bool IsDemo() => demoAccess.Enabled && string.Equals(
+        User.FindFirst("name")?.Value,
+        demoAccess.Username,
+        StringComparison.OrdinalIgnoreCase);
 }

@@ -1,6 +1,10 @@
 <h1>Settings</h1>
 <p class="muted">Manage staff access and configure the recipient for email reports and alerts.</p>
 
+@if (auth.isDemo()) {
+  <p class="demo-notice">Portfolio demo mode keeps private email and staff credentials protected. Operational features remain available.</p>
+}
+
 <section class="panel">
   <h2>Email delivery</h2>
   @if (email(); as config) {
@@ -14,14 +18,14 @@
       <p class="muted">Configure SMTP host, port, sender, TLS, and credentials as server environment secrets; then set Email__Enabled=true and restart the API.</p>
     }
     <label>Manager email recipient
-      <input type="email" required maxlength="200" [(ngModel)]="managerEmail" placeholder="manager@example.com" />
+      <input type="email" required maxlength="200" [(ngModel)]="managerEmail" placeholder="manager@example.com" [disabled]="auth.isDemo()" />
     </label>
     <label class="checkbox">
-      <input type="checkbox" [(ngModel)]="alertsEnabled" />
+      <input type="checkbox" [(ngModel)]="alertsEnabled" [disabled]="auth.isDemo()" />
       Send low-stock alerts (requires SMTP to be enabled)
     </label>
     <div class="actions">
-      <button type="button" [disabled]="savingEmail()" (click)="saveEmailSettings()">
+      <button type="button" [disabled]="savingEmail() || auth.isDemo()" (click)="saveEmailSettings()">
         {{ savingEmail() ? 'Saving…' : 'Save email settings' }}
       </button>
       @if (auth.role() === 'Admin') {

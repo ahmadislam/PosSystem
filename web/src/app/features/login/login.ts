@@ -31,6 +31,7 @@ export class Login {
     document.documentElement.style.setProperty('--pointer-y', y.toFixed(3));
   }
   readonly busy = signal(false);
+  readonly demoBusy = signal(false);
   readonly error = signal<string | null>(null);
 
   submit(): void {
@@ -43,6 +44,18 @@ export class Login {
       error: (err) => {
         this.error.set(apiError(err));
         this.busy.set(false);
+      },
+    });
+  }
+
+  exploreDemo(): void {
+    this.demoBusy.set(true);
+    this.error.set(null);
+    this.auth.loginDemo().subscribe({
+      next: () => void this.router.navigate(['/dashboard']),
+      error: (err) => {
+        this.error.set(apiError(err));
+        this.demoBusy.set(false);
       },
     });
   }

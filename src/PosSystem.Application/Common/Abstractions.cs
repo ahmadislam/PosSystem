@@ -59,6 +59,13 @@ public class JwtSettings
     public int RefreshTokenDays { get; set; } = 7;
 }
 
+public class DemoAccessSettings
+{
+    public bool Enabled { get; set; }
+    public string Username { get; set; } = "portfolio-demo";
+    public string Email { get; set; } = "portfolio-demo@example.invalid";
+}
+
 public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)
 {
     public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
