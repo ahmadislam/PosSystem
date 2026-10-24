@@ -2,6 +2,12 @@ name: Render diagnostics
 
 on:
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the selected revision after the read-only checks
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [feature/release-readiness]
     paths:
@@ -32,6 +38,13 @@ jobs:
           RENDER_PUBLIC_URL: ${{ vars.RENDER_PUBLIC_URL || 'https://possystem-1-26mq.onrender.com' }}
           RENDER_DIAGNOSTICS_OUTPUT: render-diagnostics.json
         run: python scripts/render-diagnostics.py
+      - name: Deploy selected revision and wait for Render
+        if: ${{ inputs.deploy }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          RENDER_PUBLIC_URL: ${{ vars.RENDER_PUBLIC_URL || 'https://possystem-1-26mq.onrender.com' }}
+        run: python scripts/render-deploy.py
       - name: Save safe diagnostic report
         if: always()
         uses: actions/upload-artifact@v4
